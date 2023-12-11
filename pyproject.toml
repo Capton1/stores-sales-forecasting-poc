@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "stores-sales-forecasting-poc"
+version = "0.1"
+description = ""
+authors = ["acaille_lbc <acaille@littlebigcode.fr>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+kaggle = "^1.5.16"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
