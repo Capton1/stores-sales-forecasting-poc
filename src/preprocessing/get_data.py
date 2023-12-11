@@ -26,8 +26,9 @@ def merge_df(
 
 
 def fix_transfered_holidays(df: pd.DataFrame) -> pd.DataFrame:
-    """A holiday that is transferred officially falls on that calendar day, but was moved to another date by the government.
-    Hence, they are normal days. This function fix this.
+    """A holiday that is transferred officially falls on that calendar day,
+    but was moved to another date by the government. Hence, they are normal days.
+    This function fix this.
 
     Args:
         df (pd.DataFrame): train or test df
@@ -62,8 +63,19 @@ def interpolate_oil_price(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_train_data(train_df = True, features = ['date', 'family','onpromotion','typeholiday',
-    'dcoilwtico','city', 'typestores', 'cluster']) -> pd.DataFrame:
+def get_train_data(
+    train_df=True,
+    features=[
+        "date",
+        "family",
+        "onpromotion",
+        "typeholiday",
+        "dcoilwtico",
+        "city",
+        "typestores",
+        "cluster",
+    ],
+) -> pd.DataFrame:
     """retrieve training data
 
     Returns:
@@ -87,6 +99,7 @@ def get_train_data(train_df = True, features = ['date', 'family','onpromotion','
 
     return res
 
+
 def select_features(df: pd.DataFrame, features: list) -> pd.DataFrame:
     """_summary_
 
@@ -96,12 +109,13 @@ def select_features(df: pd.DataFrame, features: list) -> pd.DataFrame:
     Returns:
         pd.DataFrame: _description_
     """
-    if 'sales' in df.columns:
+    if "sales" in df.columns:
         df = df[features + ["sales"]]
     else:
         df = df[features]
 
     return df
+
 
 def export_df(df: pd.DataFrame, train=True) -> None:
     if train:
@@ -117,4 +131,3 @@ def process_train_test_data() -> None:
 
     export_df(train, train=True)
     export_df(test, train=False)
-
