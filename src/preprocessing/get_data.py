@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+from typing import Tuple
 
 def merge_df(
     df: pd.DataFrame, holidays: pd.DataFrame, oils: pd.DataFrame, stores: pd.DataFrame
@@ -16,11 +16,13 @@ def merge_df(
     Returns:
         pd.DataFrame: df merged
     """
-    res = pd.merge(df, holidays, how="left", on="date", validate="many_to_one")
-    res = pd.merge(res, oils, how="left", on="date")
-    res = pd.merge(
-        res, stores, how="left", on="store_nbr", suffixes=("holiday", "stores")
-    )
+    res = pd.merge(df, oils, on="date")
+    res = pd.merge(res, holidays, how="left", on="date")
+    
+    res = res.fillna("None")
+    res = pd.merge(res, stores, how="left", on="store_nbr")
+
+    res.rename(columns={"type_x": "typeholiday", "type_y": "typestores"}, inplace = True)
 
     return res
 
@@ -71,7 +73,7 @@ def get_train_data(
         "onpromotion",
         "typeholiday",
         "dcoilwtico",
-        "city",
+        "state",
         "typestores",
         "cluster",
     ],
@@ -94,8 +96,12 @@ def get_train_data(
 
     stores = pd.read_csv("data/raw/stores.csv")
 
-    res = merge_df(df, oils, holidays, stores)
+    res = merge_df(df, holidays, oils, stores)
     res = select_features(res, features)
+
+    res['date'] = pd.to_datetime(res['date'])
+
+    # TODO : add column for paycheck (every 15th days)
 
     return res
 
@@ -124,10 +130,13 @@ def export_df(df: pd.DataFrame, train=True) -> None:
         df.to_csv("data/processed/processed_test.csv")
 
 
-def process_train_test_data() -> None:
+def process_train_test_data(save = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """create processed df and store it in data/processed foler"""
     train = get_train_data(train_df=True)
     test = get_train_data(train_df=False)
 
-    export_df(train, train=True)
-    export_df(test, train=False)
+    if save:
+        export_df(train, train=True)
+        export_df(test, train=False)
+
+    return train, test
