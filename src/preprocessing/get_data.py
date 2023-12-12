@@ -17,9 +17,10 @@ def merge_df(
         pd.DataFrame: df merged
     """
     res = pd.merge(df, oils, on="date")
+
     res = pd.merge(res, holidays, how="left", on="date")
-    
-    res = res.fillna("None")
+    res = res.fillna("Normal")
+
     res = pd.merge(res, stores, how="left", on="store_nbr")
 
     res.rename(columns={"type_x": "typeholiday", "type_y": "typestores"}, inplace = True)
@@ -43,7 +44,6 @@ def fix_transfered_holidays(df: pd.DataFrame) -> pd.DataFrame:
 
     # Since all of the transferred stuff has been dealt with, we will drop the column
     df = df.drop("transferred", axis=1)
-
     # Brige day can be considered as Holidays
     df.loc[df["type"] == "Bridge", "type"] = "Holiday"
 
@@ -88,18 +88,20 @@ def get_train_data(
     else:
         df = pd.read_csv("data/raw/test.csv")
 
+    df['date'] = pd.to_datetime(df['date'])
+
     oils = pd.read_csv("data/raw/oil.csv")
     oils = interpolate_oil_price(oils)
+    oils['date'] = pd.to_datetime(oils['date'])
 
     holidays = pd.read_csv("data/raw/holidays_events.csv")
     holidays = fix_transfered_holidays(holidays)
+    holidays['date'] = pd.to_datetime(holidays['date'])
 
     stores = pd.read_csv("data/raw/stores.csv")
 
     res = merge_df(df, holidays, oils, stores)
     res = select_features(res, features)
-
-    res['date'] = pd.to_datetime(res['date'])
 
     # TODO : add column for paycheck (every 15th days)
 
