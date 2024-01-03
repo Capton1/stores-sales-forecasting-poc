@@ -1,6 +1,8 @@
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
-from typing import Tuple
+
 
 def merge_df(
     df: pd.DataFrame, holidays: pd.DataFrame, oils: pd.DataFrame, stores: pd.DataFrame
@@ -23,7 +25,7 @@ def merge_df(
 
     res = pd.merge(res, stores, how="left", on="store_nbr")
 
-    res.rename(columns={"type_x": "typeholiday", "type_y": "typestores"}, inplace = True)
+    res.rename(columns={"type_x": "typeholiday", "type_y": "typestores"}, inplace=True)
 
     return res
 
@@ -66,14 +68,13 @@ def interpolate_oil_price(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_train_data(
-    train_df=True,
+    is_train_df=True,
     features=[
         "date",
         "family",
         "onpromotion",
         "typeholiday",
         "dcoilwtico",
-        "state",
         "typestores",
         "cluster",
     ],
@@ -83,20 +84,20 @@ def get_train_data(
     Returns:
         pd.DataFrame: training data
     """
-    if train_df:
+    if is_train_df:
         df = pd.read_csv("data/raw/train.csv")
     else:
         df = pd.read_csv("data/raw/test.csv")
 
-    df['date'] = pd.to_datetime(df['date'])
+    df["date"] = pd.to_datetime(df["date"])
 
     oils = pd.read_csv("data/raw/oil.csv")
     oils = interpolate_oil_price(oils)
-    oils['date'] = pd.to_datetime(oils['date'])
+    oils["date"] = pd.to_datetime(oils["date"])
 
     holidays = pd.read_csv("data/raw/holidays_events.csv")
     holidays = fix_transfered_holidays(holidays)
-    holidays['date'] = pd.to_datetime(holidays['date'])
+    holidays["date"] = pd.to_datetime(holidays["date"])
 
     stores = pd.read_csv("data/raw/stores.csv")
 
@@ -125,20 +126,20 @@ def select_features(df: pd.DataFrame, features: list) -> pd.DataFrame:
     return df
 
 
-def export_df(df: pd.DataFrame, train=True) -> None:
-    if train:
+def export_df(df: pd.DataFrame, is_train_df=True) -> None:
+    if is_train_df:
         df.to_csv("data/processed/processed_train.csv")
     else:
-        df.to_csv("data/processed/processed_test.csv")
+        df.to_csv("data/trusted/test_set.csv")
 
 
-def process_train_test_data(save = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def process_train_test_data(save=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """create processed df and store it in data/processed foler"""
-    train = get_train_data(train_df=True)
-    test = get_train_data(train_df=False)
+    train = get_train_data(is_train_df=True)
+    test = get_train_data(is_train_df=False)
 
     if save:
-        export_df(train, train=True)
-        export_df(test, train=False)
+        export_df(train, is_train_df=True)
+        export_df(test, is_train_df=False)
 
     return train, test

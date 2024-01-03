@@ -18,3 +18,9 @@ $ kaggle competitions download -c store-sales-time-series-forecasting
 $ mkdir data; mv store-sales-time-series-forecasting.zip data
 $ unzip store-sales-time-series-forecasting.zip
 ```
+
+TODO :
+    - Explicabilité des modèles de time series :
+        - Shap value
+        - Lime
+        - Partial distribution

@@ -1,5 +1,5 @@
 all: 
-	poetry run python ./src/main.py
+	poetry run python src/
 
 install:
 	poetry install
