@@ -1,0 +1,20 @@
+models:
+  arima:
+    optimizer: adam
+    loss: mean_squared_logarithmic_error
+    batch_size: 32
+
+  lstm:
+    optimizer: adam
+    loss: mean_squared_logarithmic_error
+    batch_size: 64
+
+  prophet:
+    optimizer: adam
+    loss: mean_squared_logarithmic_error
+    batch_size: 16
+
+  rnn:
+    optimizer: adam
+    loss: mean_squared_logarithmic_error
+    batch_size: 16

@@ -1,7 +1,6 @@
 from typing import Tuple
 
 import pandas as pd
-from keras.preprocessing.sequence import TimeseriesGenerator
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 
 
@@ -57,53 +56,29 @@ def one_hot_encode(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
     return res
 
 
-def get_features_and_target(
-    df: pd.DataFrame, target="sales"
+def prepare_training_data(
+    df: pd.DataFrame, save=False
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """get features and target sets for model training and eval
+    """_summary_
 
     Args:
-        df (pd.DataFrame): df with features and y
-        target (str): target column name
+        df (pd.DataFrame): _description_
 
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: features_set, target_set
+        pd.DataFrame: _description_
     """
-    return df.drop(["date", target], axis=1), df[[target]]
+    scaled_data = scale_df(df[["onpromotion", "dcoilwtico", "cluster"]])
+    df.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
+    res = pd.concat([df, scaled_data], axis=1)
 
+    to_encode = ["typeholiday", "family", "typestores"]
+    for i in to_encode:
+        res = one_hot_encode(res, i)
 
-def get_timeseries_generator(
-    df: pd.DataFrame,
-    target: str = "sales",
-    window_size: int = 30,
-    batch_size: int = 1,
-    return_x: bool = False,
-    return_y: bool = False,
-) -> TimeseriesGenerator:
-    """get a timeseries generator for a given df
+    train_set, val_set = train_val_split(res)
 
-    Args:
-        df (pd.DataFrame): df to generate from
-        target (str): target column name
-        window_size (int, optional): size of the window. Defaults to 1.
-        batch_size (int, optional): size of the batch. Defaults to 32.
+    if save:
+        train_set.to_csv("data/trusted/training_set.csv")
+        val_set.to_csv("data/trusted/validation_set.csv")
 
-    Returns:
-        TimeseriesGenerator: timeseries generator
-    """
-    features, target = get_features_and_target(df, target)
-    gen = TimeseriesGenerator(
-        features.to_numpy(),
-        target.to_numpy(),
-        length=window_size,
-        batch_size=batch_size,
-    )
-
-    if return_y and return_x:
-        return gen, features, target
-    elif return_y:
-        return gen, target
-    elif return_x:
-        return gen, features
-    else:
-        return gen
+    return train_set, val_set
