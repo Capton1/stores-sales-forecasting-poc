@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -52,7 +52,7 @@ def fix_transfered_holidays(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def interpolate_oil_price(df: pd.DataFrame) -> pd.DataFrame:
+def interpolate_oil_price(df: pd.DataFrame, oil_column: str = "dcoilwtico") -> pd.DataFrame:
     """handle NA in oil price df
 
     Args:
@@ -61,13 +61,14 @@ def interpolate_oil_price(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: oil price df with no NA
     """
-    df["dcoilwtico"] = np.where(df["dcoilwtico"] == 0, np.nan, df["dcoilwtico"])
-    df["dcoilwtico"] = df["dcoilwtico"].interpolate(limit_direction="both")
+    df[oil_column] = np.where(df[oil_column] == 0, np.nan, df[oil_column])
+    df[oil_column] = df[oil_column].interpolate(limit_direction="both")
 
     return df
 
 
 def get_train_data(
+    raw_path: Dict[str, str],
     is_train_df=True,
     features=[
         "date",
@@ -85,21 +86,21 @@ def get_train_data(
         pd.DataFrame: training data
     """
     if is_train_df:
-        df = pd.read_csv("data/raw/train.csv")
+        df = pd.read_csv(raw_path["train"])
     else:
-        df = pd.read_csv("data/raw/test.csv")
+        df = pd.read_csv(raw_path["test"])
 
     df["date"] = pd.to_datetime(df["date"])
 
-    oils = pd.read_csv("data/raw/oil.csv")
+    oils = pd.read_csv(raw_path["oil"])
     oils = interpolate_oil_price(oils)
     oils["date"] = pd.to_datetime(oils["date"])
 
-    holidays = pd.read_csv("data/raw/holidays_events.csv")
+    holidays = pd.read_csv(raw_path["holidays_events"])
     holidays = fix_transfered_holidays(holidays)
     holidays["date"] = pd.to_datetime(holidays["date"])
 
-    stores = pd.read_csv("data/raw/stores.csv")
+    stores = pd.read_csv(raw_path["stores"])
 
     res = merge_df(df, holidays, oils, stores)
     res = select_features(res, features)
@@ -110,36 +111,59 @@ def get_train_data(
 
 
 def select_features(df: pd.DataFrame, features: list) -> pd.DataFrame:
-    """_summary_
+    """
+    Selects the specified features from the given DataFrame.
 
     Args:
-        df (pd.DataFrame): _description_
+        df (pd.DataFrame): The input DataFrame.
+        features (list): The list of features to select.
 
     Returns:
-        pd.DataFrame: _description_
+        pd.DataFrame: The DataFrame with the selected features.
     """
     if "sales" in df.columns:
         df = df[features + ["sales"]]
     else:
+        # case for test set
         df = df[features]
 
     return df
 
 
-def export_df(df: pd.DataFrame, is_train_df=True) -> None:
+def export_df(df: pd.DataFrame, save_path: Dict[str,str], is_train_df=True) -> None:
+    """
+    Export a DataFrame to a CSV file.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to be exported.
+        is_train_df (bool, optional): Indicates whether the DataFrame is a training set or not. 
+            Defaults to True.
+
+    Returns:
+        None
+    """
     if is_train_df:
-        df.to_csv("data/processed/processed_train.csv")
+        df.to_csv(save_path["train"])
     else:
-        df.to_csv("data/trusted/test_set.csv")
+        df.to_csv(save_path["test"])
 
 
-def process_train_test_data(save=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """create processed df and store it in data/processed foler"""
-    train = get_train_data(is_train_df=True)
-    test = get_train_data(is_train_df=False)
+def collect_data(path: Dict[str,str], save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Collect and process the train and test data. Save the processed data if specified.
+
+    Args:
+        path (Dict[str,str]): A dictionary containing the paths to the raw and processed data.
+        save (bool, optional): Whether to save the processed data. Defaults to True.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the processed train and test dataframes.
+    """
+    train = get_train_data(path["raw"], is_train_df=True)
+    test = get_train_data(path["raw"], is_train_df=False)
 
     if save:
-        export_df(train, is_train_df=True)
-        export_df(test, is_train_df=False)
+        export_df(train, path["processed"], is_train_df=True)
+        export_df(test, path["processed"], is_train_df=False)
 
     return train, test

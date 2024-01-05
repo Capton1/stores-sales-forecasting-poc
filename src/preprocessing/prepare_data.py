@@ -2,12 +2,13 @@ from typing import Tuple
 
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from typing import Dict, List
 
 
 def train_val_split(
     df: pd.DataFrame, val_ratio=0.85
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """split df in train and validation set
+    """split df in train and validation set. Split at specified ratio cause it's a time series.
 
     Args:
         df (pd.DataFrame): original train set
@@ -15,7 +16,6 @@ def train_val_split(
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: train set and validation set
     """
-
     val_size = int(len(df) * val_ratio)
     train_data = df.iloc[:val_size]
     val_data = df.iloc[val_size:]
@@ -37,7 +37,7 @@ def scale_df(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(scaler.fit_transform(df), columns=list(df.columns))
 
 
-def one_hot_encode(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+def one_hot_encode(df: pd.DataFrame, columns_name: List[str]) -> pd.DataFrame:
     """encode given column in df using one hot encoding
 
     Args:
@@ -47,38 +47,55 @@ def one_hot_encode(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: encoded df
     """
-    encoder = OneHotEncoder(sparse_output=False)
-    ohe = encoder.fit_transform(df[[column_name]])
+   # encoder = OneHotEncoder(sparse_output=False)
+    #ohe = encoder.fit_transform(df[columns_name])
+    #print(ohe, df[columns_name])
+    #res = pd.concat([df, pd.DataFrame(ohe, columns=df[columns_name].nunique())], axis=1)
+    #res.drop([columns_name], axis=1, inplace=True)
 
-    res = pd.concat([df, pd.DataFrame(ohe, columns=df[column_name].unique())], axis=1)
-    res.drop([column_name], axis=1, inplace=True)
-
-    return res
+    return pd.get_dummies(df, columns=columns_name)
 
 
 def prepare_training_data(
-    df: pd.DataFrame, save=False
+    df: pd.DataFrame, val_ratio=0.85, save=False, save_path: Dict[str, str] = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """_summary_
+    """Prepare training data by scaling, encoding, and splitting the DataFrame.
+
+    This function takes a DataFrame as input and performs the following steps:
+    1. Scale the columns 'onpromotion', 'dcoilwtico', and 'cluster' using a scaler.
+    2. Drop the columns 'onpromotion', 'dcoilwtico', and 'cluster' from the DataFrame.
+    3. Concatenate the scaled columns with the original DataFrame.
+    4. Perform one-hot encoding on the columns 'typeholiday', 'family', and 'typestores'.
+    5. Split the DataFrame into training and validation sets.
+    6. Optionally save the training and validation sets to CSV files.
 
     Args:
-        df (pd.DataFrame): _description_
+        df (pd.DataFrame): The input DataFrame.
+        save (bool, optional): Whether to save the training and validation sets to CSV files. Defaults to False.
 
     Returns:
-        pd.DataFrame: _description_
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and validation sets.
     """
     scaled_data = scale_df(df[["onpromotion", "dcoilwtico", "cluster"]])
     df.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
     res = pd.concat([df, scaled_data], axis=1)
 
-    to_encode = ["typeholiday", "family", "typestores"]
-    for i in to_encode:
-        res = one_hot_encode(res, i)
+    res.rename(columns={"typeholiday": "typedays", "family": "typesoldproducts"}, inplace=True)
 
-    train_set, val_set = train_val_split(res)
-
+    to_encode = ["typedays", "typesoldproducts", "typestores"]
+    res = one_hot_encode(res, to_encode)
+    
+    # group by date
+    res = res.groupby("date").agg({"sales": "mean", "onpromotion": "mean", "dcoilwtico": "mean", "cluster": "mean"}) 
+    res.drop(["date"], axis=1, inplace=True)
+    print(res)
+    return
+    train_set, val_set = train_val_split(res, val_ratio=val_ratio)
+    
     if save:
-        train_set.to_csv("data/trusted/training_set.csv")
-        val_set.to_csv("data/trusted/validation_set.csv")
+        if not save_path:
+            raise ValueError("save_path must be specified if save is True")
+        train_set.to_csv(save_path["train"])
+        val_set.to_csv(save_path["val"])
 
     return train_set, val_set

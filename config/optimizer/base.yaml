@@ -1,20 +1,24 @@
 models:
   arima:
     optimizer: adam
-    loss: mean_squared_logarithmic_error
+    loss: mse
     batch_size: 32
+    epochs: 1
 
   lstm:
     optimizer: adam
-    loss: mean_squared_logarithmic_error
+    loss: mse
     batch_size: 64
+    epochs: 1
 
   prophet:
     optimizer: adam
-    loss: mean_squared_logarithmic_error
+    loss: mse
     batch_size: 16
+    epochs: 1
 
   rnn:
     optimizer: adam
-    loss: mean_squared_logarithmic_error
+    loss: mse
     batch_size: 16
+    epochs: 1

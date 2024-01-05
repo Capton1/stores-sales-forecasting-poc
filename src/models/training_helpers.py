@@ -1,60 +1,8 @@
 from typing import Tuple
 
 import pandas as pd
-from keras.preprocessing.sequence import TimeseriesGenerator
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-
-
-def train_val_split(
-    df: pd.DataFrame, val_ratio=0.85
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """split df in train and validation set
-
-    Args:
-        df (pd.DataFrame): original train set
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: train set and validation set
-    """
-
-    val_size = int(len(df) * val_ratio)
-    train_data = df.iloc[:val_size]
-    val_data = df.iloc[val_size:]
-
-    return train_data, val_data
-
-
-def scale_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Use MinMaxScaler on a given df
-
-    Args:
-        df (pd.DataFrame): df to scale
-
-    Returns:
-        pd.DataFrame: scaled df
-    """
-    scaler = MinMaxScaler(feature_range=(0, 1))
-
-    return pd.DataFrame(scaler.fit_transform(df), columns=list(df.columns))
-
-
-def one_hot_encode(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
-    """encode given column in df using one hot encoding
-
-    Args:
-        df (pd.DataFrame): df to encode
-        column_name (str): name of the column to encode
-
-    Returns:
-        pd.DataFrame: encoded df
-    """
-    encoder = OneHotEncoder(sparse_output=False)
-    ohe = encoder.fit_transform(df[[column_name]])
-
-    res = pd.concat([df, pd.DataFrame(ohe, columns=df[column_name].unique())], axis=1)
-    res.drop([column_name], axis=1, inplace=True)
-
-    return res
+from keras.preprocessing.sequence import TimeseriesGenerator
 
 
 def get_features_and_target(
@@ -69,16 +17,11 @@ def get_features_and_target(
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: features_set, target_set
     """
-    return df.drop(["date", target], axis=1), df[[target]]
+    return df.drop([target], axis=1), df[[target]]
 
 
-def get_timeseries_generator(
-    df: pd.DataFrame,
-    target: str = "sales",
-    window_size: int = 30,
-    batch_size: int = 1,
-    return_x: bool = False,
-    return_y: bool = False,
+def get_timeseries_generator_from_df(
+    df: pd.DataFrame, target: str = 'sales', window_size: int = 30, batch_size: int = 1, return_x: bool = False, return_y: bool = False,
 ) -> TimeseriesGenerator:
     """get a timeseries generator for a given df
 
@@ -92,18 +35,13 @@ def get_timeseries_generator(
         TimeseriesGenerator: timeseries generator
     """
     features, target = get_features_and_target(df, target)
-    gen = TimeseriesGenerator(
-        features.to_numpy(),
-        target.to_numpy(),
-        length=window_size,
-        batch_size=batch_size,
-    )
-
+    gen = TimeseriesGenerator(features.to_numpy(), target.to_numpy(), length=window_size, batch_size=batch_size)
+    
     if return_y and return_x:
         return gen, features, target
     elif return_y:
         return gen, target
-    elif return_x:
+    elif return_x: 
         return gen, features
-    else:
+    else:    
         return gen

@@ -17,7 +17,9 @@ def lstm(
     load_model=False,
     generator: TimeseriesGenerator = None,
     model_name=f'lstm {date.today().strftime("%Y-%m-%d-%H-%M-%S")}',
-    save_model=False,
+    save=False,
+    epochs=1,
+    batch_size=64,
 ) -> Sequential:
     """
     LSTM model for training or loading a pre-trained model.
@@ -61,8 +63,9 @@ def lstm(
         )
 
     if train:
-        model.fit(generator, epochs=5, batch_size=512)
+        model.fit(generator, epochs=epochs, batch_size=batch_size)
 
-    pickle.dump(model, open(f"{MODEL_PATH}/{model_name}.h5", "wb"))
+    if save:
+        pickle.dump(model, open(f"{MODEL_PATH}/{model_name}.h5", "wb"))
 
     return model
