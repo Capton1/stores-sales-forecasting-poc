@@ -6,10 +6,7 @@ import pandas as pd
 from keras.layers import LSTM, Dense
 from keras.models import Sequential
 from keras.preprocessing.sequence import TimeseriesGenerator
-
-from .training_helpers import get_timeseries_generator
-
-MODEL_PATH = "../models_save/lstm"
+from sklearn.metrics import r2_score
 
 
 def lstm(
@@ -20,6 +17,9 @@ def lstm(
     save=False,
     epochs=1,
     batch_size=64,
+    optimizer="adam",
+    loss="mse",
+    save_path=None,
 ) -> Sequential:
     """
     LSTM model for training or loading a pre-trained model.
@@ -44,7 +44,7 @@ def lstm(
         raise ValueError("You must provide a generator if you want to train a model")
 
     if load_model:
-        model = pickle.load(open(f"{MODEL_PATH}/{model_name}.h5", "rb"))
+        model = pickle.load(open(f"{save_path}/{model_name}.h5", "rb"))
     else:
         model = Sequential()
         model.add(
@@ -57,15 +57,15 @@ def lstm(
         )
         model.add(Dense(1))
         model.compile(
-            optimizer="adam",
-            loss="mean_squared_logarithmic_error",
-            metrics=["accuracy"],
+            optimizer=optimizer,
+            loss=loss,
+            metrics=["accuracy", "mean_squared_error", "mean_absolute_error"],
         )
 
     if train:
         model.fit(generator, epochs=epochs, batch_size=batch_size)
 
     if save:
-        pickle.dump(model, open(f"{MODEL_PATH}/{model_name}.h5", "wb"))
+        pickle.dump(model, open(f"{save_path}/{model_name}.h5", "wb"))
 
     return model

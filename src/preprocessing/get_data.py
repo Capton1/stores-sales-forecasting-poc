@@ -52,7 +52,9 @@ def fix_transfered_holidays(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def interpolate_oil_price(df: pd.DataFrame, oil_column: str = "dcoilwtico") -> pd.DataFrame:
+def interpolate_oil_price(
+    df: pd.DataFrame, oil_column: str = "dcoilwtico"
+) -> pd.DataFrame:
     """handle NA in oil price df
 
     Args:
@@ -72,6 +74,7 @@ def get_train_data(
     is_train_df=True,
     features=[
         "date",
+        "state",
         "family",
         "onpromotion",
         "typeholiday",
@@ -130,13 +133,13 @@ def select_features(df: pd.DataFrame, features: list) -> pd.DataFrame:
     return df
 
 
-def export_df(df: pd.DataFrame, save_path: Dict[str,str], is_train_df=True) -> None:
+def export_df(df: pd.DataFrame, save_path: Dict[str, str], is_train_df=True) -> None:
     """
     Export a DataFrame to a CSV file.
 
     Args:
         df (pd.DataFrame): The DataFrame to be exported.
-        is_train_df (bool, optional): Indicates whether the DataFrame is a training set or not. 
+        is_train_df (bool, optional): Indicates whether the DataFrame is a training set or not.
             Defaults to True.
 
     Returns:
@@ -148,7 +151,9 @@ def export_df(df: pd.DataFrame, save_path: Dict[str,str], is_train_df=True) -> N
         df.to_csv(save_path["test"])
 
 
-def collect_data(path: Dict[str,str], save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def collect_data(
+    path: Dict[str, str], save: bool = True
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Collect and process the train and test data. Save the processed data if specified.
 

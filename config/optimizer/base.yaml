@@ -10,6 +10,7 @@ models:
     loss: mse
     batch_size: 64
     epochs: 1
+    look_back: 30
 
   prophet:
     optimizer: adam

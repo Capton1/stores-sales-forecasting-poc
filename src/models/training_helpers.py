@@ -1,7 +1,7 @@
 from typing import Tuple
 
+import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from keras.preprocessing.sequence import TimeseriesGenerator
 
 
@@ -21,7 +21,12 @@ def get_features_and_target(
 
 
 def get_timeseries_generator_from_df(
-    df: pd.DataFrame, target: str = 'sales', window_size: int = 30, batch_size: int = 1, return_x: bool = False, return_y: bool = False,
+    df: pd.DataFrame,
+    target: str = "sales",
+    window_size: int = 30,
+    batch_size: int = 1,
+    return_x: bool = False,
+    return_y: bool = False,
 ) -> TimeseriesGenerator:
     """get a timeseries generator for a given df
 
@@ -35,13 +40,39 @@ def get_timeseries_generator_from_df(
         TimeseriesGenerator: timeseries generator
     """
     features, target = get_features_and_target(df, target)
-    gen = TimeseriesGenerator(features.to_numpy(), target.to_numpy(), length=window_size, batch_size=batch_size)
-    
+    gen = TimeseriesGenerator(
+        features.to_numpy(),
+        target.to_numpy(),
+        length=window_size,
+        batch_size=batch_size,
+    )
+
     if return_y and return_x:
         return gen, features, target
     elif return_y:
         return gen, target
-    elif return_x: 
+    elif return_x:
         return gen, features
-    else:    
+    else:
         return gen
+
+
+def get_timeseries_generator(X, y, config_model):
+    """
+    Create a time series generator for training data.
+
+    Parameters:
+    X_train (array-like): The input training data.
+    y_train (array-like): The target training data.
+    config_model (dict): Configuration parameters for the model.
+
+    Returns:
+    gen (TimeseriesGenerator): The time series generator for training data.
+    """
+    X = np.asarray(X).astype(np.float32)
+    y = np.asarray(y).astype(np.float32)
+    gen = TimeseriesGenerator(
+        X.to_numpy(), y.to_numpy(), length=config_model["look_back"], batch_size=1
+    )
+
+    return gen

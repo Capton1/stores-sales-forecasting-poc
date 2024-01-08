@@ -1,8 +1,7 @@
-from typing import Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-from typing import Dict, List
 
 
 def train_val_split(
@@ -47,11 +46,11 @@ def one_hot_encode(df: pd.DataFrame, columns_name: List[str]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: encoded df
     """
-   # encoder = OneHotEncoder(sparse_output=False)
-    #ohe = encoder.fit_transform(df[columns_name])
-    #print(ohe, df[columns_name])
-    #res = pd.concat([df, pd.DataFrame(ohe, columns=df[columns_name].nunique())], axis=1)
-    #res.drop([columns_name], axis=1, inplace=True)
+    # encoder = OneHotEncoder(sparse_output=False)
+    # ohe = encoder.fit_transform(df[columns_name])
+    # print(ohe, df[columns_name])
+    # res = pd.concat([df, pd.DataFrame(ohe, columns=df[columns_name].nunique())], axis=1)
+    # res.drop([columns_name], axis=1, inplace=True)
 
     return pd.get_dummies(df, columns=columns_name)
 
@@ -80,18 +79,19 @@ def prepare_training_data(
     df.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
     res = pd.concat([df, scaled_data], axis=1)
 
-    res.rename(columns={"typeholiday": "typedays", "family": "typesoldproducts"}, inplace=True)
+    res.rename(
+        columns={"typeholiday": "typedays", "family": "typesoldproducts"}, inplace=True
+    )
 
-    to_encode = ["typedays", "typesoldproducts", "typestores"]
+    to_encode = ["typedays", "typesoldproducts", "typestores", "state"]
     res = one_hot_encode(res, to_encode)
-    
+
     # group by date
-    res = res.groupby("date").agg({"sales": "mean", "onpromotion": "mean", "dcoilwtico": "mean", "cluster": "mean"}) 
+    # res = res.groupby("date").agg({c: "mean" if c in ["onpromotion", "dcoilwtico", "cluster", "sales"] else "first" for c in res.drop('date',axis=1).columns})
     res.drop(["date"], axis=1, inplace=True)
-    print(res)
-    return
+
     train_set, val_set = train_val_split(res, val_ratio=val_ratio)
-    
+
     if save:
         if not save_path:
             raise ValueError("save_path must be specified if save is True")

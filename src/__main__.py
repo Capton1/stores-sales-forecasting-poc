@@ -12,14 +12,25 @@ from config.get_config import get_config
 
 
 def main(config_files: Namespace):
-    config = get_config(optimizer_config=config_files.optimizer_config, data_config=config_files.data_config)
+    config = get_config(
+        optimizer_config=config_files.optimizer_config,
+        data_config=config_files.data_config,
+    )
 
-    launch_pipeline(config, config_files.model, config_files.train, config_files.generate, save=config_files.save)
+    launch_pipeline(
+        config,
+        config_files.model,
+        config_files.train,
+        config_files.generate,
+        save=config_files.save,
+    )
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("-c", "--optimizer_config", default="base", help="optimizer config file")
+    parser.add_argument(
+        "-c", "--optimizer_config", default="base", help="optimizer config file"
+    )
     parser.add_argument("-d", "--data_config", default="base", help="data config file")
     parser.add_argument(
         "-m",
@@ -36,6 +47,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.train and args.generate:
-        raise ValueError("Cannot use both -t/--train and -g/--generate options at the same time.")
+        raise ValueError(
+            "Cannot use both -t/--train and -g/--generate options at the same time."
+        )
 
     main(args)
