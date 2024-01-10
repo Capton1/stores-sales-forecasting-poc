@@ -87,7 +87,10 @@ def prepare_training_data(
     res = one_hot_encode(res, to_encode)
 
     # group by date
-    # res = res.groupby("date").agg({c: "mean" if c in ["onpromotion", "dcoilwtico", "cluster", "sales"] else "first" for c in res.drop('date',axis=1).columns})
+    # mean = ["dcoilwtico", "cluster"]
+    # sum = ["onpromotion", "sales"] + [c for c in res.columns if "typesoldproducts_" in c]
+    # res = res.groupby(["store_nbr", "date"]).agg({c: "mean" if c in mean else "sum" if c in sum else "first" for c in res}).drop(["store_nbr", "date"], axis=1)
+    print(res.head())
     res.drop(["date"], axis=1, inplace=True)
 
     train_set, val_set = train_val_split(res, val_ratio=val_ratio)

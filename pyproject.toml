@@ -8,18 +8,23 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.10, <3.11"
 kaggle = "^1.5.16"
-pandas = "^2.1.4"
-seaborn = "^0.13.0"
+pandas = "==1.3.*"
+seaborn = "0.11.2"
 scikit-learn = "^1.3.2"
 joblib = "^1.3.2"
 argparse = "^1.4.0"
 hydra-core = "^1.3.2"
-shap = "^0.40.0"
+shap = "==0.44.*"
 # check out https://pypi.org/project/tensorflow-io-gcs-filesystem/ for more info
 tensorflow-io-gcs-filesystem = { version = "0.25.0"}
-tensorflow = "^2.8.0"
+tensorflow = "==2.14.*"
 keras = "^2.8.0"
 lime = "^0.2.0.1"
+numpy = "1.23.5"
+tensorflow-addons = "^0.23.0"
+scipy = "1.11.x"
+tqdm = "^4.66.1"
+xgboost = "^2.0.3"
 
 
 [tool.poetry.group.dev.dependencies]

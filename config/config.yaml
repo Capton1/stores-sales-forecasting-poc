@@ -1,3 +1,4 @@
 defaults:
   - optimizer: base
   - data: base
+  - pipeline: base
