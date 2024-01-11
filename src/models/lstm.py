@@ -24,6 +24,7 @@ def build_simple_lstm(
     Returns:
         Sequential: The LSTM model.
     """
+    # Input layers shape : (batch_size, look_back, n_features)
     model = Sequential()
     model.add(
         LSTM(
@@ -65,6 +66,7 @@ def build_multivariate_lstm(
     Returns:
         Model: The LSTM model.
     """
+    # Input layers shape : (batch_size, look_back, n_features_continuous) and (batch_size, look_back, n_features_categorical)
     input_continuous = Input(shape=input_shape_continuous)
     input_categorical = Input(shape=input_shape_categorical)
 
@@ -143,7 +145,7 @@ def lstm(
         if type == "simple":
             # input shape is look_back *  number of features
             model = build_simple_lstm(
-                (look_back, generator[0][0].data.shape[2]),
+                (look_back, generator[0][0].data.shape[2]), # (30, 64)
                 optimizer,
                 loss,
                 learning_rate,
@@ -151,8 +153,8 @@ def lstm(
         elif type == "multivariate":
             # continuous and categorical data are separated in the generator
             model = build_multivariate_lstm(
-                (look_back, generator[0][0][0].data.shape[2]),
-                (look_back, generator[0][0][1].data.shape[2]),
+                (look_back, generator[0][0][0].data.shape[2]), # (30, 3)
+                (look_back, generator[0][0][1].data.shape[2]), # (30, 61)
                 optimizer,
                 loss,
                 learning_rate,

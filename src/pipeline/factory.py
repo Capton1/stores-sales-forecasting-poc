@@ -3,14 +3,16 @@ import pathlib
 from datetime import datetime, timezone
 from typing import Dict
 
+import numpy as np
 import pandas as pd
 from keras.models import Model
 from sklearn.metrics import mean_squared_error
 
 from models.lstm import lstm
+from models.xgboost import xgboost
 from models.training_helpers import (get_features_and_target,
                                      get_multiple_input_timeseries_generator,
-                                     get_single_input_timeseries_generator)
+                                     get_single_input_timeseries_generator, get_dmatrix)
 from preprocessing.get_data import collect_data
 from preprocessing.prepare_data import prepare_training_data
 
@@ -41,9 +43,24 @@ def load_model_and_generator(
     config_model=None,
     save_models_path=None,
 ) -> Model:
-    generator = None
+    """
+    Loads a model and generator based on the specified parameters.
 
+    Args:
+        train (bool): Whether to train the model or not.
+        model_type (str): The type of model to load.
+        X (pandas.DataFrame): The input features.
+        y (pandas.Series): The target variable.
+        save (bool, optional): Whether to save the model or not. Defaults to False.
+        model_name (str, optional): The name of the model to load. Defaults to None.
+        config_model (dict, optional): The configuration parameters for the model. Defaults to None.
+        save_models_path (str, optional): The path to save the models. Defaults to None.
+
+    Returns:
+        tuple: A tuple containing the loaded model and generator.
+    """   
     if model_type == "lstm":
+        # get right generator
         if config_model["type"] == "multivariate":
             X_continuous = X[["onpromotion", "dcoilwtico", "cluster"]]
             X_categorical = X.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1)
@@ -55,10 +72,14 @@ def load_model_and_generator(
                 look_back=config_model["look_back"],
                 batch_size=1,
             )
-        else:
+        elif config_model["type"] == "simple":
             generator = get_single_input_timeseries_generator(
                 X, y, look_back=config_model["look_back"], batch_size=1
             )
+        else :
+            raise ValueError("Model type not found")
+            
+        print("LSTM model loaded")
 
         model = lstm(
             train=train,
@@ -76,8 +97,27 @@ def load_model_and_generator(
         )
 
     elif model_type == "xgboost":
-        model = None
+        
+        generator = (X, y)
+        
+        print("XGBoost model loaded")
+        
+        model = xgboost(
+            train=train,
+            load_model=model_name,
+            generator=generator,
+            save=save,
+            n_estimators=config_model["n_estimators"],
+            max_depth=config_model["max_depth"],
+            loss=config_model["loss"],
+            learning_rate=config_model["learning_rate"],
+            save_path=save_models_path,
+        )
+            
     elif model_type == "prophet":
+        
+        print("Prophet model loaded")
+
         model = None
     else:
         raise ValueError("Model not found")
@@ -119,7 +159,7 @@ def train_model(
     )
 
 
-def eval_model(config, model_type: str, model_name: str) -> float:
+def eval_model(config, model_type: str, model_name: str, X_val: pd.DataFrame, y_val: pd.DataFrame) -> float:
     """Trains the model.
 
     Args:
@@ -127,13 +167,14 @@ def eval_model(config, model_type: str, model_name: str) -> float:
         model_name (str): model to use
         save (bool, optional): whether to save the model. Defaults to True.
     """
-    trusted_data_files = config["data"]["paths"]["trusted"]
+    print(f"Evaluating model {model_type} {model_name} ...")
+    
     config_model = config["optimizer"]["models"][model_type]
     save_models_path = config["data"]["paths"]["models"][model_type]
-
-    X_val, y_val = get_features_and_target(
-        pd.read_csv(trusted_data_files["val"], index_col=0)
-    )
+    
+    # handle different model type for lstm
+    if model_type == "lstm":
+        config_model["type"] = model_name.split()[0]
 
     model, val_gen = load_model_and_generator(
         False,
@@ -146,13 +187,23 @@ def eval_model(config, model_type: str, model_name: str) -> float:
         save_models_path=save_models_path,
     )
 
-    pred = model.predict(val_gen)
-    mse = round(mean_squared_error(y_val, pred), 2)
+    if model_type == "lstm":
+        pred = model.predict(val_gen)
+        print(type(val_gen[0]))
+        print(y_val[int(config_model["look_back"]):].shape, pred.shape)
+        mse = round(mean_squared_error(y_val[int(config_model["look_back"]):], pred), 2)
+    elif model_type == "xgboost":
+        pred = model.predict(X_val)
+        mse = round(mean_squared_error(y_val, pred), 2)
+    elif model_type == "prophet":
+        mse = 0
+    else:
+        raise ValueError("Model not found")
 
     return mse
 
 
-def validation_pipeline(models_to_validate, config):
+def validation_pipeline(models_to_validate, config, limit: int):
     """
     Runs the validation pipeline for the given models and configuration.
 
@@ -164,17 +215,22 @@ def validation_pipeline(models_to_validate, config):
         None
     """
     filename = f'{str(datetime.now(timezone.utc)).split(".")[0]}'
-    print(f"Writing validation results in {filename} ...")
+    print(f"Writing validation results in {filename} ... \n")
+
+    trusted_data_files = config["data"]["paths"]["trusted"]
+    X_val, y_val = get_features_and_target(
+        pd.read_csv(trusted_data_files["val"], index_col=0)[:limit]
+    )
 
     min_mse, best_type, best_model = math.inf, None, None
     with open(
-        f'{pathlib.Path(config["data"]["paths"]["logs"]).absolute()}/{filename}', "w"
+        f'{pathlib.Path(config["data"]["paths"]["logs"]["validation"]).absolute()}/{filename}', "w+"
     ) as file:
         for model_type, models in models_to_validate.items():
             for model_name in models:
-                mse = eval_model(config, model_type, model_name)
-                model_name = model_name.split()[-2:]
-                file.write(f"Type: {model_type} Name: {model_name} mse: {mse}")
+                mse = eval_model(config, model_type, model_name, X_val, y_val)
+                model_name = ' '.join(model_name.split()[-2:])
+                file.write(f"Type: {model_type} - Name: {model_name} - MSE: {mse}")
 
                 if mse < min_mse:
                     min_mse, best_type, best_model = mse, model_type, model_name
@@ -201,5 +257,4 @@ def launch_pipeline(
         train_model(config, model, save=save, model_name=load_model, limit=limit)
 
     if validate:
-        print(config["pipeline"]["validation"]["models"])
-        validation_pipeline(config["pipeline"]["validation"]["models"], config)
+        validation_pipeline(config["pipeline"]["validation"]["models"], config, limit=limit)

@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 from keras.preprocessing.sequence import TimeseriesGenerator, pad_sequences
-from keras.utils import Sequence
+from xgboost import DMatrix
 
 
 def get_features_and_target(
@@ -25,7 +25,7 @@ def get_single_input_timeseries_generator(
     X: pd.DataFrame, y: pd.DataFrame, look_back: int, batch_size: int = 1
 ):
     """
-    Create a time series generator for training data.
+    Create a time series generator for training data. Used for lstm.
 
     Parameters:
     X_train (array-like): The input data.
@@ -53,7 +53,7 @@ def get_multiple_input_timeseries_generator(
     batch_size: int = 1,
 ):
     """
-    Create a time series generator for training data.
+    Create a time series generator for training data. Used for lstm.
 
     Parameters:
     X1 (pd.DataFrame): The first input data.
@@ -146,3 +146,18 @@ class MultipleInputTimeseriesGenerator(TimeseriesGenerator):
         X_batch = [X1_batch, X2_batch]
 
         return X_batch, Y_batch
+
+
+def get_dmatrix(X: pd.DataFrame, y: pd.DataFrame) -> DMatrix:
+    """
+    Create a DMatrix object from the input data and labels. Used for xgboost.
+
+    Args:
+        X (pd.DataFrame): The input data.
+        y (pd.DataFrame): The labels.
+
+    Returns:
+        DMatrix: The DMatrix object.
+
+    """
+    return DMatrix(X, label=y)

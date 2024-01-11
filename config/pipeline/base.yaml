@@ -1,8 +1,9 @@
 validation:
   models:
     xgboost:
-      - 2024-01-08 16:17:51
+      - xgboost 2024-01-11 09:48:46
     lstm:
-      - 2024-01-08 16:17:51
+      - multivariate 2024-01-10 14:12:43
+      - simple 2024-01-10 14:31:59
     prophet:
       - 2024-01-08 16:17:51
