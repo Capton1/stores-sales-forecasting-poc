@@ -161,3 +161,17 @@ def get_dmatrix(X: pd.DataFrame, y: pd.DataFrame) -> DMatrix:
 
     """
     return DMatrix(X, label=y)
+
+
+def get_prophet_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create a DataFrame with the required columns for Prophet.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the required columns for Prophet.
+    """
+    df["date"] = df.index
+    return df[["date", "sales"]].rename(columns={"date": "ds", "sales": "y"})

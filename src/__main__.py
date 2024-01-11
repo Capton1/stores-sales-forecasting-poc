@@ -52,7 +52,7 @@ if __name__ == "__main__":
         default=1000,
         help="limit data to use",
         type=int,
-        choices=range(1, 1849447),
+        choices=range(1, 1023),
     )
 
     group = parser.add_mutually_exclusive_group()

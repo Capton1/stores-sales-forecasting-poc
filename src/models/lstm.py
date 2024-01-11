@@ -11,7 +11,7 @@ from tensorflow.keras.models import Sequential
 
 
 def build_simple_lstm(
-    input_shape: Tuple[int, int], optimizer: str, loss: str, learning_rate: float
+    input_shape: Tuple[int, int], optimizer: str, loss: str
 ) -> Sequential:
     """
     Build a simple LSTM model.
@@ -41,7 +41,6 @@ def build_simple_lstm(
     model.compile(
         optimizer=optimizer,
         loss=loss,
-        learning_rate=0.01,
     )
 
     return model
@@ -52,7 +51,6 @@ def build_multivariate_lstm(
     input_shape_categorical: Tuple[int, int],
     optimizer: str,
     loss: str,
-    learning_rate: float,
 ) -> Model:
     """
     Build a multivariate LSTM model.
@@ -77,7 +75,7 @@ def build_multivariate_lstm(
     lstm_layer = Activation("linear")(lstm_layer)
     lstm_layer = Model(inputs=input_continuous, outputs=lstm_layer)
 
-    dense_layer = Dense(50, activation="relu")(input_categorical)
+    dense_layer = Dense(4, activation="relu")(input_categorical)
     dense_layer = Dense(1)(dense_layer)
     dense_layer = Activation("linear")(dense_layer)
     dense_layer = Model(inputs=input_categorical, outputs=dense_layer)
@@ -90,7 +88,6 @@ def build_multivariate_lstm(
     model.compile(
         optimizer=optimizer,
         loss=loss,
-        learning_rate=learning_rate,
     )
 
     return model
@@ -105,7 +102,6 @@ def lstm(
     batch_size: int = 64,
     optimizer: str = "adam",
     loss: str = "mse",
-    learning_rate: float = 0.01,
     look_back: int = 30,
     type: str = "simple",
     save_path: str = None,
@@ -145,19 +141,17 @@ def lstm(
         if type == "simple":
             # input shape is look_back *  number of features
             model = build_simple_lstm(
-                (look_back, generator[0][0].data.shape[2]), # (30, 64)
+                (look_back, generator[0][0].data.shape[2]),  # (30, 64)
                 optimizer,
                 loss,
-                learning_rate,
             )
         elif type == "multivariate":
             # continuous and categorical data are separated in the generator
             model = build_multivariate_lstm(
-                (look_back, generator[0][0][0].data.shape[2]), # (30, 3)
-                (look_back, generator[0][0][1].data.shape[2]), # (30, 61)
+                (look_back, generator[0][0][0].data.shape[2]),  # (30, 3)
+                (look_back, generator[0][0][1].data.shape[2]),  # (30, 61)
                 optimizer,
                 loss,
-                learning_rate,
             )
         else:
             raise ValueError("Model type not found")

@@ -25,6 +25,8 @@ tensorflow-addons = "^0.23.0"
 scipy = "1.11.x"
 tqdm = "^4.66.1"
 xgboost = "^2.0.3"
+prophet = "^1.1.5"
+plotly = "^5.18.0"
 
 
 [tool.poetry.group.dev.dependencies]

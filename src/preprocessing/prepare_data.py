@@ -1,11 +1,11 @@
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler
 
 
 def train_val_split(
-    df: pd.DataFrame, val_ratio=0.85
+    df: pd.DataFrame, val_ratio=0.9
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """split df in train and validation set. Split at specified ratio cause it's a time series.
 
@@ -56,7 +56,7 @@ def one_hot_encode(df: pd.DataFrame, columns_name: List[str]) -> pd.DataFrame:
 
 
 def prepare_training_data(
-    df: pd.DataFrame, val_ratio=0.85, save=False, save_path: Dict[str, str] = None
+    df: pd.DataFrame, val_ratio=0.9, save=False, save_path: Dict[str, str] = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Prepare training data by scaling, encoding, and splitting the DataFrame.
 
@@ -75,23 +75,21 @@ def prepare_training_data(
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and validation sets.
     """
-    scaled_data = scale_df(df[["onpromotion", "dcoilwtico", "cluster"]])
-    df.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
-    res = pd.concat([df, scaled_data], axis=1)
+    # group by date
+    mean = ["dcoilwtico", "cluster"]
+    sum = ["onpromotion", "sales"]
+    res = df.groupby(["date"]).agg({c: "mean" if c in mean else "sum" if c in sum else "first" for c in df}).drop(["date"], axis=1).reset_index()
+    
+    scaled_data = scale_df(res[["onpromotion", "dcoilwtico", "cluster"]])
+    res.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
+    res = pd.concat([res, scaled_data], axis=1)
 
-    res.rename(
-        columns={"typeholiday": "typedays", "family": "typesoldproducts"}, inplace=True
-    )
+    res.rename(columns={"typeholiday": "typedays"}, inplace=True)
 
-    to_encode = ["typedays", "typesoldproducts", "typestores", "state"]
+    to_encode = ["typedays"]
     res = one_hot_encode(res, to_encode)
 
-    # group by date
-    # mean = ["dcoilwtico", "cluster"]
-    # sum = ["onpromotion", "sales"] + [c for c in res.columns if "typesoldproducts_" in c]
-    # res = res.groupby(["store_nbr", "date"]).agg({c: "mean" if c in mean else "sum" if c in sum else "first" for c in res}).drop(["store_nbr", "date"], axis=1)
-    print(res.head())
-    res.drop(["date"], axis=1, inplace=True)
+    res.set_index("date", inplace=True)
 
     train_set, val_set = train_val_split(res, val_ratio=val_ratio)
 

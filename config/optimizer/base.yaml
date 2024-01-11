@@ -3,20 +3,16 @@ models:
     loss: squarederror
     learning_rate: 0.01
     max_depth: 6
-    n_estimators: 1000
+    n_estimators: 10000
 
   lstm:
     optimizer: adam
     loss: mse
     batch_size: 64
-    learning_rate: 0.01
     look_back: 30
-    type: simple
-    epochs: 1
+    type: multivariate # or simple
+    epochs: 20
 
 
   prophet:
-    optimizer: adam
-    loss: mse
-    batch_size: 16
-    epochs: 1
+    

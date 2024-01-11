@@ -2,13 +2,14 @@ import pathlib
 import pickle
 from datetime import datetime, timezone
 from typing import Tuple
+
 import pandas as pd
-
-from keras.preprocessing.sequence import TimeseriesGenerator
-from xgboost import XGBRegressor, DMatrix
+from xgboost import XGBRegressor
 
 
-def build_xgboost(n_estimators: int, max_depth: int, loss: str, learning_rate: float) -> XGBRegressor:
+def build_xgboost(
+    n_estimators: int, max_depth: int, loss: str, learning_rate: float
+) -> XGBRegressor:
     """
     Build an XGBoost model.
 
@@ -45,7 +46,7 @@ def xgboost(
     Args:
         train (bool, optional): Whether to train the model. Defaults to False.
         load_model (str, optional): The name of the model to load. Defaults to None.
-        generator (Tuple[TimeseriesGenerator], optional): The generator used for training the model. 
+        generator (Tuple[TimeseriesGenerator], optional): The generator used for training the model.
             Required if train=True. Defaults to None.
         save (str, optional): Whether to save the trained model. Defaults to False.
         epochs (int, optional): The number of training epochs. Defaults to 1.
@@ -58,7 +59,6 @@ def xgboost(
     Returns:
         XGBRegressor: The trained or loaded XGBoost model.
     """
-    
     if not train and not load_model:
         raise ValueError("You must either train or load a model")
 
@@ -73,7 +73,7 @@ def xgboost(
         model = build_xgboost(n_estimators, max_depth, loss, learning_rate)
 
     if train:
-        model.fit(*generator, eval_set=[generator], eval_metric=["rmse"] ,verbose=True)
+        model.fit(*generator, eval_set=[generator], eval_metric=["rmse"], verbose=True)
 
     if save:
         model_name = f'xgboost {str(datetime.now(timezone.utc)).split(".")[0]}'
@@ -83,6 +83,5 @@ def xgboost(
         )
 
         print(f"Model saved as {model_name}")
-
 
     return model

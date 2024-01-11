@@ -74,13 +74,11 @@ def get_train_data(
     is_train_df=True,
     features=[
         "date",
-        #        "store_nbr", # uncomment to use store_nbr (cf prepare_data.py line 90)
-        "state",
-        "family",
+        #"family",
         "onpromotion",
         "typeholiday",
         "dcoilwtico",
-        "typestores",
+        #"typestores",
         "cluster",
     ],
 ) -> pd.DataFrame:

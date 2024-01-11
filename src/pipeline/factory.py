@@ -9,10 +9,11 @@ from keras.models import Model
 from sklearn.metrics import mean_squared_error
 
 from models.lstm import lstm
-from models.xgboost import xgboost
-from models.training_helpers import (get_features_and_target,
+from models.training_helpers import (get_prophet_df, get_features_and_target,
                                      get_multiple_input_timeseries_generator,
-                                     get_single_input_timeseries_generator, get_dmatrix)
+                                     get_single_input_timeseries_generator)
+from models.xgboost import xgboost
+from models.prophet import prophet
 from preprocessing.get_data import collect_data
 from preprocessing.prepare_data import prepare_training_data
 
@@ -58,7 +59,7 @@ def load_model_and_generator(
 
     Returns:
         tuple: A tuple containing the loaded model and generator.
-    """   
+    """
     if model_type == "lstm":
         # get right generator
         if config_model["type"] == "multivariate":
@@ -76,9 +77,9 @@ def load_model_and_generator(
             generator = get_single_input_timeseries_generator(
                 X, y, look_back=config_model["look_back"], batch_size=1
             )
-        else :
+        else:
             raise ValueError("Model type not found")
-            
+
         print("LSTM model loaded")
 
         model = lstm(
@@ -90,18 +91,16 @@ def load_model_and_generator(
             batch_size=config_model["batch_size"],
             optimizer=config_model["optimizer"],
             loss=config_model["loss"],
-            learning_rate=config_model["learning_rate"],
             look_back=config_model["look_back"],
             type=config_model["type"],
             save_path=save_models_path,
         )
 
     elif model_type == "xgboost":
-        
         generator = (X, y)
-        
+
         print("XGBoost model loaded")
-        
+
         model = xgboost(
             train=train,
             load_model=model_name,
@@ -113,12 +112,13 @@ def load_model_and_generator(
             learning_rate=config_model["learning_rate"],
             save_path=save_models_path,
         )
-            
+
     elif model_type == "prophet":
-        
+        generator = get_prophet_df(y)
+
         print("Prophet model loaded")
 
-        model = None
+        model = prophet(train=train, load_model=model_name, generator=generator, save=save, save_path=save_models_path)
     else:
         raise ValueError("Model not found")
 
@@ -159,7 +159,9 @@ def train_model(
     )
 
 
-def eval_model(config, model_type: str, model_name: str, X_val: pd.DataFrame, y_val: pd.DataFrame) -> float:
+def eval_model(
+    config, model_type: str, model_name: str, X_val: pd.DataFrame, y_val: pd.DataFrame
+) -> float:
     """Trains the model.
 
     Args:
@@ -168,13 +170,14 @@ def eval_model(config, model_type: str, model_name: str, X_val: pd.DataFrame, y_
         save (bool, optional): whether to save the model. Defaults to True.
     """
     print(f"Evaluating model {model_type} {model_name} ...")
-    
+
     config_model = config["optimizer"]["models"][model_type]
     save_models_path = config["data"]["paths"]["models"][model_type]
-    
-    # handle different model type for lstm
+
+    # handle different model type for lstm + predict only 1 value
     if model_type == "lstm":
         config_model["type"] = model_name.split()[0]
+        config_model["look_back"] = 1
 
     model, val_gen = load_model_and_generator(
         False,
@@ -188,15 +191,15 @@ def eval_model(config, model_type: str, model_name: str, X_val: pd.DataFrame, y_
     )
 
     if model_type == "lstm":
-        pred = model.predict(val_gen)
-        print(type(val_gen[0]))
-        print(y_val[int(config_model["look_back"]):].shape, pred.shape)
-        mse = round(mean_squared_error(y_val[int(config_model["look_back"]):], pred), 2)
+        pred = model.predict(val_gen).reshape(-1)
+        mse = round(mean_squared_error(y_val[1:], pred), 2)
     elif model_type == "xgboost":
         pred = model.predict(X_val)
         mse = round(mean_squared_error(y_val, pred), 2)
     elif model_type == "prophet":
-        mse = 0
+        future = model.make_future_dataframe(periods=len(y_val), freq="D", include_history=False)
+        forecast = model.predict(future)
+        mse = round(mean_squared_error(y_val["sales"], forecast["yhat"]), 2)
     else:
         raise ValueError("Model not found")
 
@@ -224,13 +227,13 @@ def validation_pipeline(models_to_validate, config, limit: int):
 
     min_mse, best_type, best_model = math.inf, None, None
     with open(
-        f'{pathlib.Path(config["data"]["paths"]["logs"]["validation"]).absolute()}/{filename}', "w+"
+        f'{pathlib.Path(config["data"]["paths"]["logs"]["validation"]).absolute()}/{filename}',
+        "w+",
     ) as file:
         for model_type, models in models_to_validate.items():
             for model_name in models:
                 mse = eval_model(config, model_type, model_name, X_val, y_val)
-                model_name = ' '.join(model_name.split()[-2:])
-                file.write(f"Type: {model_type} - Name: {model_name} - MSE: {mse}")
+                file.write(f"Type: {model_type} - Name: {model_name} - MSE: {mse} \n")
 
                 if mse < min_mse:
                     min_mse, best_type, best_model = mse, model_type, model_name
@@ -257,4 +260,6 @@ def launch_pipeline(
         train_model(config, model, save=save, model_name=load_model, limit=limit)
 
     if validate:
-        validation_pipeline(config["pipeline"]["validation"]["models"], config, limit=limit)
+        validation_pipeline(
+            config["pipeline"]["validation"]["models"], config, limit=limit
+        )
