@@ -55,48 +55,85 @@ def one_hot_encode(df: pd.DataFrame, columns_name: List[str]) -> pd.DataFrame:
     return pd.get_dummies(df, columns=columns_name)
 
 
+def input_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """input missing dates in df
+
+    Args:
+        df (pd.DataFrame): df to input missing dates
+
+    Returns:
+        pd.DataFrame: df with missing dates inputed
+    """
+    # create a new df with all dates
+    date_range = pd.date_range(start=df.index.min(), end=df.index.max())
+    res = pd.DataFrame(index=date_range)
+
+    # merge the two df
+    res = pd.merge(res, df, how="left", left_index=True, right_index=True)
+
+    # fill missing values in numeric columns
+    res.interpolate(method="linear", inplace=True)
+
+    # fill missing values in typedays
+    res["typeholiday"] = res["typeholiday"].fillna("Normal")
+
+    return res
+
+
 def prepare_training_data(
     df: pd.DataFrame, val_ratio=0.9, save=False, save_path: Dict[str, str] = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Prepare training data by scaling, encoding, and splitting the DataFrame.
 
-    This function takes a DataFrame as input and performs the following steps:
-    1. Scale the columns 'onpromotion', 'dcoilwtico', and 'cluster' using a scaler.
-    2. Drop the columns 'onpromotion', 'dcoilwtico', and 'cluster' from the DataFrame.
-    3. Concatenate the scaled columns with the original DataFrame.
-    4. Perform one-hot encoding on the columns 'typeholiday', 'family', and 'typestores'.
-    5. Split the DataFrame into training and validation sets.
-    6. Optionally save the training and validation sets to CSV files.
-
     Args:
-        df (pd.DataFrame): The input DataFrame.
-        save (bool, optional): Whether to save the training and validation sets to CSV files. Defaults to False.
+        df (pd.DataFrame): The input DataFrame containing the data to be prepared.
+        val_ratio (float, optional): The ratio of validation data to be split from the training data. Defaults to 0.9.
+        save (bool, optional): Whether to save the prepared training and validation data to CSV files. Defaults to False.
+        save_path (Dict[str, str], optional): The file paths to save the training and validation data.
+            Required if `save` is True. Defaults to None.
 
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and validation sets.
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the prepared training and validation data DataFrames.
+
+    Raises:
+        ValueError: If `save` is True but `save_path` is not specified.
+
     """
     # group by date
     mean = ["dcoilwtico", "cluster"]
     sum = ["onpromotion", "sales"]
-    res = df.groupby(["date"]).agg({c: "mean" if c in mean else "sum" if c in sum else "first" for c in df}).drop(["date"], axis=1).reset_index()
-    
+    res = (
+        df.groupby(["date"])
+        .agg({c: "mean" if c in mean else "sum" if c in sum else "first" for c in df})
+        .drop(["date"], axis=1)
+        .reset_index()
+    )
+
+    # apply scaling
     scaled_data = scale_df(res[["onpromotion", "dcoilwtico", "cluster"]])
     res.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
     res = pd.concat([res, scaled_data], axis=1)
 
-    res.rename(columns={"typeholiday": "typedays"}, inplace=True)
+    # input missing dates
+    res.set_index("date", inplace=True)
+    res = input_missing_dates(res)
 
+    # apply one hot encoding
+    res.rename(columns={"typeholiday": "typedays"}, inplace=True)
     to_encode = ["typedays"]
     res = one_hot_encode(res, to_encode)
-
-    res.set_index("date", inplace=True)
 
     train_set, val_set = train_val_split(res, val_ratio=val_ratio)
 
     if save:
         if not save_path:
             raise ValueError("save_path must be specified if save is True")
+
         train_set.to_csv(save_path["train"])
         val_set.to_csv(save_path["val"])
+
+        print(
+            f"Training and validation data saved to {save_path['train']} and {save_path['val']}"
+        )
 
     return train_set, val_set

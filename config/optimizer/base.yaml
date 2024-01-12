@@ -10,7 +10,7 @@ models:
     loss: mse
     batch_size: 64
     look_back: 30
-    type: multivariate # or simple
+    type: simple # multivariate or simple
     epochs: 20
 
 

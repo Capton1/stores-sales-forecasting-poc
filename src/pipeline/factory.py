@@ -3,17 +3,19 @@ import pathlib
 from datetime import datetime, timezone
 from typing import Dict
 
-import numpy as np
 import pandas as pd
 from keras.models import Model
 from sklearn.metrics import mean_squared_error
 
 from models.lstm import lstm
-from models.training_helpers import (get_prophet_df, get_features_and_target,
-                                     get_multiple_input_timeseries_generator,
-                                     get_single_input_timeseries_generator)
-from models.xgboost import xgboost
 from models.prophet import prophet
+from models.training_helpers import (
+    get_features_and_target,
+    get_multiple_input_timeseries_generator,
+    get_prophet_df,
+    get_single_input_timeseries_generator,
+)
+from models.xgboost import xgboost
 from preprocessing.get_data import collect_data
 from preprocessing.prepare_data import prepare_training_data
 
@@ -30,7 +32,7 @@ def generate_train_val_sets(data_path: Dict[str, str], save: bool = True):
     """
     train, _ = collect_data(data_path, save=save)
     prepare_training_data(
-        train, val_ratio=0.85, save=save, save_path=data_path["trusted"]
+        train, val_ratio=0.9, save=save, save_path=data_path["trusted"]
     )
 
 
@@ -118,7 +120,13 @@ def load_model_and_generator(
 
         print("Prophet model loaded")
 
-        model = prophet(train=train, load_model=model_name, generator=generator, save=save, save_path=save_models_path)
+        model = prophet(
+            train=train,
+            load_model=model_name,
+            generator=generator,
+            save=save,
+            save_path=save_models_path,
+        )
     else:
         raise ValueError("Model not found")
 
@@ -130,7 +138,7 @@ def train_model(
     model_type: str,
     save: bool = True,
     model_name: str = None,
-    limit: int = 1000,
+    limit: int = 1520,
 ):
     """Trains the model.
 
@@ -197,7 +205,9 @@ def eval_model(
         pred = model.predict(X_val)
         mse = round(mean_squared_error(y_val, pred), 2)
     elif model_type == "prophet":
-        future = model.make_future_dataframe(periods=len(y_val), freq="D", include_history=False)
+        future = model.make_future_dataframe(
+            periods=len(y_val), freq="D", include_history=False
+        )
         forecast = model.predict(future)
         mse = round(mean_squared_error(y_val["sales"], forecast["yhat"]), 2)
     else:
@@ -250,7 +260,7 @@ def launch_pipeline(
     validate: bool = False,
     save: bool = False,
     load_model: str = None,
-    limit: int = 1000,
+    limit: int = 1520,
 ):
     """Launches the pipeline."""
     if generate:

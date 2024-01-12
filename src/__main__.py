@@ -33,6 +33,7 @@ def main(config_files: Namespace):
 if __name__ == "__main__":
     parser = ArgumentParser()
 
+    # choose Hydra config files
     parser.add_argument(
         "-c", "--optimizer_config", default="base", help="optimizer config file"
     )
@@ -49,10 +50,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--limit",
-        default=1000,
+        default=1520,
         help="limit data to use",
         type=int,
-        choices=range(1, 1023),
+        choices=range(1, 1520),
     )
 
     group = parser.add_mutually_exclusive_group()

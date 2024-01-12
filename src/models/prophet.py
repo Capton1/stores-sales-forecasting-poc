@@ -6,6 +6,7 @@ import pandas as pd
 from prophet import Prophet
 from prophet.diagnostics import performance_metrics
 
+
 def prophet(
     train: bool = False,
     load_model: str = None,
