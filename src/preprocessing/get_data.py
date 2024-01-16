@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,6 +26,8 @@ def merge_df(
     res = pd.merge(res, stores, how="left", on="store_nbr")
 
     res.rename(columns={"type_x": "typeholiday", "type_y": "typestores"}, inplace=True)
+
+    res.drop("id", axis=1, inplace=True)
 
     return res
 
@@ -94,11 +96,11 @@ def get_train_data(
 
     df["date"] = pd.to_datetime(df["date"])
 
-    oils = pd.read_csv(raw_path["oil"])
+    oils = pd.read_csv(raw_path["oils"])
     oils = interpolate_oil_price(oils)
     oils["date"] = pd.to_datetime(oils["date"])
 
-    holidays = pd.read_csv(raw_path["holidays_events"])
+    holidays = pd.read_csv(raw_path["holidays"])
     holidays = fix_transfered_holidays(holidays)
     holidays["date"] = pd.to_datetime(holidays["date"])
 
@@ -151,7 +153,7 @@ def export_df(df: pd.DataFrame, save_path: Dict[str, str], is_train_df=True) -> 
 
 
 def collect_data(
-    path: Dict[str, str], save: bool = True
+    path: Dict[str, Any], save: bool = False
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Collect and process the train and test data. Save the processed data if specified.

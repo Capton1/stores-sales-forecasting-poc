@@ -46,12 +46,6 @@ def one_hot_encode(df: pd.DataFrame, columns_name: List[str]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: encoded df
     """
-    # encoder = OneHotEncoder(sparse_output=False)
-    # ohe = encoder.fit_transform(df[columns_name])
-    # print(ohe, df[columns_name])
-    # res = pd.concat([df, pd.DataFrame(ohe, columns=df[columns_name].nunique())], axis=1)
-    # res.drop([columns_name], axis=1, inplace=True)
-
     return pd.get_dummies(df, columns=columns_name)
 
 
@@ -108,7 +102,6 @@ def prepare_training_data(
         .drop(["date"], axis=1)
         .reset_index()
     )
-
     # apply scaling
     scaled_data = scale_df(res[["onpromotion", "dcoilwtico", "cluster"]])
     res.drop(["onpromotion", "dcoilwtico", "cluster"], axis=1, inplace=True)
@@ -122,6 +115,8 @@ def prepare_training_data(
     res.rename(columns={"typeholiday": "typedays"}, inplace=True)
     to_encode = ["typedays"]
     res = one_hot_encode(res, to_encode)
+
+    print(res)
 
     train_set, val_set = train_val_split(res, val_ratio=val_ratio)
 
