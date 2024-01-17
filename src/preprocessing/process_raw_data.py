@@ -35,12 +35,12 @@ def merge_raw_df(
 
     res["date"] = pd.to_datetime(res["date"])
 
-    #res = group_by_date(res)
+    # res = group_by_date(res)
 
     return res
 
 
-def load_data(data_config: Dict[str, Any]) -> pd.DataFrame:
+def load_data(data_paths: Dict[str, Any]) -> pd.DataFrame:
     """load raw data
 
     Args:
@@ -49,10 +49,10 @@ def load_data(data_config: Dict[str, Any]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: raw data
     """
-    df = pd.read_csv(data_config["raw"]["train"])
-    holidays = pd.read_csv(data_config["raw"]["holidays"])
-    oils = pd.read_csv(data_config["raw"]["oils"])
-    stores = pd.read_csv(data_config["raw"]["stores"])
+    df = pd.read_csv(data_paths["raw"]["train"])
+    holidays = pd.read_csv(data_paths["raw"]["holidays"])
+    oils = pd.read_csv(data_paths["raw"]["oils"])
+    stores = pd.read_csv(data_paths["raw"]["stores"])
 
     df = merge_raw_df(df, holidays, oils, stores)
 
@@ -80,6 +80,7 @@ def fix_transfered_holidays(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def interpolate_data(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """handle NA in oil price df
 
@@ -89,8 +90,8 @@ def interpolate_data(df: pd.DataFrame, column: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: oil price df with no NA
     """
-    df[column] = np.where(df[column] == 0, np.nan, df[column])
-    df[column] = df[column].interpolate(limit_direction="both")
+    df.loc[df[column] == 0, column] = np.nan
+    df.loc[:, column].interpolate(limit_direction="both", inplace=True)
 
     return df
 
@@ -158,7 +159,7 @@ def one_hot_encode_df(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
     return pd.get_dummies(df, columns=features)
 
 
-def group_by_date(df: pd.DataFrame, mean = [], sum = []) -> pd.DataFrame:
+def group_by_date(df: pd.DataFrame, mean=[], sum=[]) -> pd.DataFrame:
     """
     Group the DataFrame by date and aggregate the columns based on their types.
 
@@ -199,7 +200,6 @@ def input_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
 
     # fill missing values in numeric columns
     res.interpolate(method="linear", inplace=True)
-    
     df = res
 
     return df
@@ -230,7 +230,9 @@ def get_preprocessing_pipeline(
             ),
             (
                 "select_useful_features",
-                FunctionTransformer(select_features, kw_args={"features": features_to_select}),
+                FunctionTransformer(
+                    select_features, kw_args={"features": features_to_select}
+                ),
             ),
             (
                 "export_preprocessed",
@@ -244,19 +246,30 @@ def get_preprocessing_pipeline(
             ),
             (
                 "group_by_date",
-                FunctionTransformer(group_by_date, kw_args={"mean": ["dcoilwtico", "cluster"], "sum": ["onpromotion", "sales"]}),
+                FunctionTransformer(
+                    group_by_date,
+                    kw_args={
+                        "mean": ["dcoilwtico", "cluster"],
+                        "sum": ["onpromotion", "sales"],
+                    },
+                ),
             ),
             (
                 "min_max_scale_df",
-                FunctionTransformer(min_max_scale_df, kw_args={"features": ["onpromotion", "dcoilwtico", "cluster"]}),
+                FunctionTransformer(
+                    min_max_scale_df,
+                    kw_args={"features": ["onpromotion", "dcoilwtico", "cluster"]},
+                ),
             ),
             (
-                "input_missing_dates", 
+                "input_missing_dates",
                 FunctionTransformer(input_missing_dates),
             ),
             (
-                "one_hot_encode_df", 
-                FunctionTransformer(one_hot_encode_df, kw_args={"features": ["typedays"]}),
+                "one_hot_encode_df",
+                FunctionTransformer(
+                    one_hot_encode_df, kw_args={"features": ["typedays"]}
+                ),
             ),
             (
                 "export_processed",
@@ -267,41 +280,33 @@ def get_preprocessing_pipeline(
                         "save": save,
                     },
                 ),
-            )
+            ),
         ]
     )
 
-    """
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("interpolate_oil_price", FunctionTransformer(interpolate), ["dcoilwtico"]),
-            (
-                "fix_transfered_holidays",
-                FunctionTransformer(fix_transfered_holidays),
-                ["typedays", "transferred"],
-            ),
-            (
-                "export_preprocessed",
-                FunctionTransformer(
-                    save_preprocessed_df,
-                    kw_args={
-                        "save_path": data_config["paths"]["processed"][type_df],
-                        "save": save,
-                        "drop_columns": ["dcoilwtico", "typedays"],
-                    },
-                ),
-                features_to_select,
-            ),
-            (
-                "min_max_scale_df",
-                MinMaxScaler(feature_range=(0, 1)),
-                ["onpromotion", "dcoilwtico", "cluster"],
-            ),
-            #("input_missing_dates", FunctionTransformer(input_missing_dates), []),
-            #("one_hot_encode_df", FunctionTransformer(one_hot_encode_df), ["typedays"])
-        ],
-        remainder="drop",
-        verbose_feature_names_out=False,
-    )
-    """
     return preprocessor
+
+
+def process_data(
+    df: pd.DataFrame,
+    data_config: Dict[str, Any],
+    save=False,
+) -> pd.DataFrame:
+    """Process the data."""
+    df = interpolate_data(df, "dcoilwtico")
+    df = fix_transfered_holidays(df)
+
+    features_to_select = data_config["features"]
+    features_to_select.append(data_config["target"])
+    df = select_features(df, features_to_select)
+
+    df = save_df(df, data_config["paths"]["processed"]["train"], save=save)
+
+    df = group_by_date(df, mean=["dcoilwtico", "cluster"], sum=["onpromotion", "sales"])
+    df = min_max_scale_df(df, ["onpromotion", "dcoilwtico", "cluster"])
+    df = input_missing_dates(df)
+    df = one_hot_encode_df(df, ["typedays"])
+
+    df = save_df(df, data_config["paths"]["trusted"]["train"], save=save)
+
+    return df

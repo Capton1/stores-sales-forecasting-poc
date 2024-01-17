@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ def get_features_and_target(
 
 def get_single_input_timeseries_generator(
     X: pd.DataFrame, y: pd.DataFrame, look_back: int, batch_size: int = 1
-):
+) -> TimeseriesGenerator:
     """
     Create a time series generator for training data. Used for lstm.
 
@@ -51,7 +51,7 @@ def get_multiple_input_timeseries_generator(
     y: pd.DataFrame,
     look_back: int,
     batch_size: int = 1,
-):
+) -> TimeseriesGenerator:
     """
     Create a time series generator for training data. Used for lstm.
 
@@ -175,3 +175,40 @@ def get_prophet_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     df["date"] = df.index
     return df[["date", "sales"]].rename(columns={"date": "ds", "sales": "y"})
+
+
+def build_lstm_generator(
+    df: pd.DataFrame, model_config: Dict[str, Any], target: str = "sales"
+) -> Tuple[TimeseriesGenerator, Tuple[int]]:
+    """
+    Build a time series generator based on the given input data and model configuration.
+
+    Args:
+        df (pd.DataFrame): The input data containing features and target variable.
+        model_config (Dict[str, Any]): The configuration for the model.
+
+    Returns:
+        Tuple[TimeseriesGenerator, Tuple[int]]: The time series generator and the shape of the input data.
+
+    Raises:
+        ValueError: If the model type is unknown.
+    """
+    X, y = get_features_and_target(df, target=target)
+
+    if model_config["type"] == "simple":
+        return get_single_input_timeseries_generator(
+            X, y, model_config["look_back"], batch_size=1
+        ), (model_config["look_back"], X.shape[1])
+    elif model_config["type"] == "multivariate":
+        X_continuous = X.select_dtypes(include=["number"])
+        X_categorical = X.select_dtypes(include=["object"])
+
+        return get_multiple_input_timeseries_generator(
+            X_continuous, X_categorical, y, model_config["look_back"], batch_size=1
+        ), (
+            (model_config["look_back"], X_continuous.shape[1])(
+                model_config["look_back"], X_categorical.shape[1]
+            )
+        )
+    else:
+        raise ValueError("Unknown model type")

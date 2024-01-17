@@ -1,16 +1,26 @@
 import pathlib
 import pickle
 from datetime import datetime, timezone
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
+import pandas as pd
 from keras.layers import LSTM, Activation, Concatenate, Dense, Input
 from keras.models import Model, Sequential
 from keras.preprocessing.sequence import TimeseriesGenerator
+from scikeras.wrappers import KerasRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer
 from tensorflow.keras.layers import LSTM, Activation, Dense
 from tensorflow.keras.models import Sequential
 
+from models.training_helpers import (
+    build_lstm_generator,
+    get_multiple_input_timeseries_generator,
+    get_single_input_timeseries_generator,
+)
 
-def build_simple_lstm(
+
+def _build_simple_lstm(
     input_shape: Tuple[int, int], optimizer: str, loss: str
 ) -> Sequential:
     """
@@ -46,7 +56,7 @@ def build_simple_lstm(
     return model
 
 
-def build_multivariate_lstm(
+def _build_multivariate_lstm(
     input_shape_continuous: Tuple[int, int],
     input_shape_categorical: Tuple[int, int],
     optimizer: str,
@@ -140,14 +150,14 @@ def lstm(
     else:
         if type == "simple":
             # input shape is look_back *  number of features
-            model = build_simple_lstm(
+            model = _build_simple_lstm(
                 (look_back, generator[0][0].data.shape[2]),  # (30, 64)
                 optimizer,
                 loss,
             )
         elif type == "multivariate":
             # continuous and categorical data are separated in the generator
-            model = build_multivariate_lstm(
+            model = _build_multivariate_lstm(
                 (look_back, generator[0][0][0].data.shape[2]),  # (30, 3)
                 (look_back, generator[0][0][1].data.shape[2]),  # (30, 61)
                 optimizer,
@@ -174,3 +184,53 @@ def lstm(
         print(f"Model saved as {model_name}")
 
     return model
+
+
+def build_lstm(
+    input_shape, model_config: Dict[str, Any], load_model_name: str = None
+) -> Model:
+    """
+    Build an LSTM model based on the given input shape and model configuration.
+
+    Args:
+        input_shape (tuple): The shape of the input data.
+        model_config (dict): The configuration parameters for the model.
+
+    Returns:
+        Model: The built LSTM model.
+    """
+    if load_model_name:
+        return open(
+            f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+            "rb",
+        )
+
+    if model_config["type"] == "simple":
+        return _build_simple_lstm(
+            input_shape, model_config["optimizer"], model_config["loss"]
+        )
+    return _build_multivariate_lstm(
+        *input_shape, model_config["optimizer"], model_config["loss"]
+    )
+
+
+def get_lstm_training_pipeline(
+    model_config: Dict[str, Any], save=False, load_model=None, input_shape=None
+) -> Pipeline:
+    if load_model and not input_shape:
+        raise ValueError("You must provide an input shape if you want to load a model")
+
+    lstm = Pipeline(
+        steps=[
+            (
+                "lstm",
+                KerasRegressor(
+                    build_fn=build_lstm(input_shape, model_config, load_model),
+                    epochs=model_config["epochs"],
+                    batch_size=model_config["batch_size"],
+                ),
+            ),
+        ]
+    )
+
+    return lstm

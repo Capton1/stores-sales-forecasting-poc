@@ -1,13 +1,15 @@
 import math
 import pathlib
+import pickle
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Any, Dict
 
 import pandas as pd
 from keras.models import Model
 from sklearn.metrics import mean_squared_error
+from sklearn.pipeline import Pipeline
 
-from models.lstm import lstm
+from models.lstm import lstm, build_lstm
 from models.prophet import prophet
 from models.training_helpers import (
     get_features_and_target,
@@ -17,23 +19,177 @@ from models.training_helpers import (
 )
 from models.xgboost import xgboost
 from preprocessing.get_data import collect_data
+from preprocessing.helpers import train_val_split
 from preprocessing.prepare_data import prepare_training_data
+from models.training_helpers import build_lstm_generator
+from preprocessing.process_raw_data import (
+    get_preprocessing_pipeline,
+    load_data,
+    process_data,
+)
 
 
-def generate_train_val_sets(data_path: Dict[str, str], save: bool = True):
+class Factory:
+    def __init__(self, data_config: Dict[str, Any]):
+        self.data_config = data_config
+
+    def get_attributes(self):
+        return self.__dict__
+
+    def _fit_data(self, X):
+        self.X = process_data(X, data_config=self.data_config)
+
+        return self
+
+    def _build_generator(self, model_config: Dict[str, Any]):
+        if self.X is None:
+            raise ValueError("Data not found. Please fit the data first")
+
+        self.model_config = model_config
+
+        if self.model_config["_name"] == "lstm":
+            self.generator, self.input_data_shape = build_lstm_generator(
+                self.X, self.model_config, self.data_config["target"]
+            )
+        elif self.model_config["_name"] == "xgboost":
+            self.generator = get_features_and_target(self.X, self.data_config["target"])
+        elif self.model_config["_name"] == "prophet":
+            self.generator = get_prophet_df(self.X)
+        else:
+            raise ValueError("Model not found")
+
+        return self
+
+    def _build_model(self, load_model_name: str = None):
+        if not self.generator:
+            raise ValueError("Generator not found. Please fit the data first")
+
+        if self.model_config["_name"] == "lstm":
+            self.model = build_lstm(
+                self.input_data_shape, self.model_config, load_model_name
+            )
+        elif self.model_config["_name"] == "xgboost":
+            pass
+        elif self.model_config["_name"] == "prophet":
+            pass
+        else:
+            raise ValueError("Model not found")
+
+        return self
+
+    def _fit_model(self, model_config: Dict[str, Any], load_model_name: str = None):
+        if self.X is None:
+            raise ValueError("Data not found. Please fit the data first")
+
+        self._build_generator(model_config)
+        self._build_model(load_model_name)
+
+        self.model.fit(
+            self.generator,
+            **self.model_config["kwargs"],
+        )
+
+        return self
+
+    def fit(self, X, model_config: Dict[str, Any] = None, load_model_name: str = None):
+        if not model_config and not load_model_name:
+            return self._fit_data(X)
+
+        self._fit_data(X)
+        self._fit_model(model_config, load_model_name)
+
+        return self
+
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.X
+
+    def save_model(self, model_name: str = None):
+        if not self.model:
+            raise ValueError("Model not found. Please fit the data first")
+
+        if not model_name:
+            model_name = f'{self.model_config["_name"]} {str(datetime.now(timezone.utc)).split(".")[0]}'
+
+        pickle.dump(
+            self.model,
+            open(
+                f"{pathlib.Path(self.model_config['save_path']).absolute()}/{model_name}.h5",
+                "wb",
+            ),
+        )
+
+        print(f"Model saved as {model_name}")
+
+        return self
+
+    def save_data(self, data_name: str = None):
+        if not self.X:
+            raise ValueError("Data not found. Please fit the data first")
+
+        if not data_name:
+            data_name = f'{str(datetime.now(timezone.utc)).split(".")[0]}'
+
+        self.X.to_csv(
+            f"{pathlib.Path(self.data_config['paths']['processed']).absolute()}/{data_name}.csv"
+        )
+
+        print(f"Data saved as {data_name}")
+
+        return self
+
+
+def generate_datasets(data_config: Dict[str, Any], save: bool = False):
     """Generates train and validation sets.
 
     Args:
-        df (pd.DataFrame): original train set
-        val_ratio (float, optional): ratio of the validation set. Defaults to 0.85.
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: train set and validation set
+        data_path (Dict[str, Any]): paths to data
+        save (bool, optional): whether to save the data. Defaults to False.
     """
-    train, _ = collect_data(data_path, save=save)
-    prepare_training_data(
-        train, val_ratio=0.9, save=save, save_path=data_path["trusted"]
-    )
+    pp = get_preprocessing_pipeline(data_config, save=save)
+
+    df = load_data(data_config["paths"])
+    train_set, val_set = train_val_split(df, val_ratio=data_config["validation_ratio"])
+
+    pp.fit_transform(train_set)
+    pp.fit_transform(val_set)
+
+
+def get_training_pipeline(
+    data_config: Dict[str, Any], model_config: Dict[str, Any]
+) -> Pipeline:
+    pp = get_preprocessing_pipeline(data_config, save=False)
+
+    df = load_data(data_config["paths"])
+    train_set, val_set = train_val_split(df, val_ratio=data_config["validation_ratio"])
+
+    if model_config["_name"] == "lstm":
+        build_lstm_generator(
+            pp.fit_transform(train_set), model_config, data_config["target"]
+        )
+
+    elif model_config["_name"] == "xgboost":
+        pass
+    elif model_config["_name"] == "prophet":
+        pass
+
+
+def generate_models(
+    data_config: Dict[str, Any], model_config: Dict[str, Any], save: bool = False
+):
+    """Generates models.
+
+    Args:
+        data_path (Dict[str, Any]): paths to data
+        save (bool, optional): whether to save the data. Defaults to False.
+    """
+    pp = get_preprocessing_pipeline(data_config, save=save)
+
+    df = load_data(data_config["paths"])
+    train_set, val_set = train_val_split(df, val_ratio=data_config["validation_ratio"])
+
+    pp.fit_transform(train_set)
+    pp.fit_transform(val_set)
 
 
 def load_model_and_generator(
@@ -264,10 +420,11 @@ def launch_pipeline(
 ):
     """Launches the pipeline."""
     if generate:
-        generate_train_val_sets(config["data"]["paths"], save=save)
+        generate_datasets(config["data"], save=save)
 
     if train:
-        train_model(config, model, save=save, model_name=load_model, limit=limit)
+        generate_models(config["data"], config["optimizer"][model], save=save)
+        # train_model(config, model, save=save, model_name=load_model, limit=limit)
 
     if validate:
         validation_pipeline(
