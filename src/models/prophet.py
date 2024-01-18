@@ -1,10 +1,48 @@
 import pathlib
 import pickle
 from datetime import datetime, timezone
+from typing import Any, Dict, Tuple
 
 import pandas as pd
 from prophet import Prophet
 from prophet.diagnostics import performance_metrics
+
+
+def _build_prophet(growth: str) -> Prophet:
+    """
+    Build a Prophet model.
+
+    Returns:
+        Prophet: The Prophet model.
+    """
+    return Prophet(growth=growth)
+
+
+from typing import Any, Dict
+
+from prophet import Prophet
+
+
+def build_prophet(model_config: Dict[str, Any], load_model_name: str = None) -> Prophet:
+    """
+    Builds a Prophet model based on the given configuration.
+
+    Args:
+        model_config (Dict[str, Any]): The configuration parameters for building the model.
+        load_model_name (str, optional): The name of the pre-trained model to load. Defaults to None.
+
+    Returns:
+        Prophet: The built Prophet model.
+    """
+    if load_model_name:
+        return pickle.load(
+            open(
+                f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+                "rb",
+            )
+        )
+
+    return _build_prophet(**model_config["build_params"])
 
 
 def prophet(

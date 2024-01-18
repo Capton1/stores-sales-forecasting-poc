@@ -3,6 +3,7 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import sys  # noqa
 from argparse import ArgumentParser, Namespace
+from typing import List
 
 from pipeline.factory import launch_pipeline
 
@@ -13,7 +14,6 @@ from config.get_config import get_config
 
 def main(config_files: Namespace):
     config = get_config(
-        optimizer_config=config_files.optimizer_config,
         data_config=config_files.data_config,
         pipeline_config=config_files.pipeline_config,
     )
@@ -21,10 +21,11 @@ def main(config_files: Namespace):
     launch_pipeline(
         config,
         config_files.model,
+        config_files.model_config,
         config_files.train,
         config_files.generate,
         save=config_files.save,
-        load_model=config_files.load,
+        load_model_name=config_files.load,
         validate=config_files.eval,
         limit=config_files.limit,
     )
@@ -34,9 +35,6 @@ if __name__ == "__main__":
     parser = ArgumentParser()
 
     # choose Hydra config files
-    parser.add_argument(
-        "-c", "--optimizer_config", default="base", help="optimizer config file"
-    )
     parser.add_argument("-d", "--data_config", default="base", help="data config file")
     parser.add_argument(
         "-p", "--pipeline_config", default="base", help="pipeline config file"
@@ -48,6 +46,7 @@ if __name__ == "__main__":
         choices=["lstm", "xgboost", "prophet"],
         help="model to use",
     )
+    parser.add_argument("-c", "--model_config", default="default", help="model config")
     parser.add_argument(
         "--limit",
         default=1520,

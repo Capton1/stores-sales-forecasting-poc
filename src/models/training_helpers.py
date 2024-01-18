@@ -206,9 +206,8 @@ def build_lstm_generator(
         return get_multiple_input_timeseries_generator(
             X_continuous, X_categorical, y, model_config["look_back"], batch_size=1
         ), (
-            (model_config["look_back"], X_continuous.shape[1])(
-                model_config["look_back"], X_categorical.shape[1]
-            )
+            (model_config["look_back"], X_continuous.shape[1]),
+            (model_config["look_back"], X_categorical.shape[1]),
         )
     else:
         raise ValueError("Unknown model type")

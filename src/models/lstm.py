@@ -207,10 +207,14 @@ def build_lstm(
 
     if model_config["type"] == "simple":
         return _build_simple_lstm(
-            input_shape, model_config["optimizer"], model_config["loss"]
+            input_shape,
+            model_config["build_params"]["optimizer"],
+            model_config["build_params"]["loss"],
         )
     return _build_multivariate_lstm(
-        *input_shape, model_config["optimizer"], model_config["loss"]
+        *input_shape,
+        model_config["build_params"]["optimizer"],
+        model_config["build_params"]["loss"],
     )
 
 

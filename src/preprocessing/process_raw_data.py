@@ -300,13 +300,9 @@ def process_data(
     features_to_select.append(data_config["target"])
     df = select_features(df, features_to_select)
 
-    df = save_df(df, data_config["paths"]["processed"]["train"], save=save)
-
     df = group_by_date(df, mean=["dcoilwtico", "cluster"], sum=["onpromotion", "sales"])
     df = min_max_scale_df(df, ["onpromotion", "dcoilwtico", "cluster"])
     df = input_missing_dates(df)
     df = one_hot_encode_df(df, ["typedays"])
-
-    df = save_df(df, data_config["paths"]["trusted"]["train"], save=save)
 
     return df

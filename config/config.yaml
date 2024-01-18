@@ -1,4 +1,6 @@
 defaults:
-  - optimizer: base
+  - lstm: lstm
+  - xgboost: xgboost
+  - prophet: prophet
   - data: base
   - pipeline: base

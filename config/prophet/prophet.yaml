@@ -1,0 +1,5 @@
+default:
+  build_params:
+    growth: linear
+  _name: prophet
+  save_path: models/prophet
