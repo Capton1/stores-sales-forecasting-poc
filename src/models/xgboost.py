@@ -1,14 +1,20 @@
 import pathlib
 import pickle
-from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 import pandas as pd
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import TimeSeriesSplit
 from xgboost import XGBRegressor
 
 
 def _build_xgboost(
-    n_estimators: int, max_depth: int, loss: str, learning_rate: float
+    n_estimators: int,
+    max_depth: int,
+    loss: str,
+    learning_rate: float,
+    eval_metric: str,
+    early_stopping_rounds: int,
 ) -> XGBRegressor:
     """
     Build an XGBoost model.
@@ -21,6 +27,8 @@ def _build_xgboost(
         learning_rate=learning_rate,
         objective=f"reg:{loss}",
         max_depth=max_depth,
+        eval_metric=eval_metric,
+        early_stopping_rounds=early_stopping_rounds,
         random_state=42,
         n_jobs=-1,
         verbosity=1,
@@ -52,59 +60,80 @@ def build_xgboost(
     return _build_xgboost(**model_config["build_params"])
 
 
-def xgboost(
-    train: bool = False,
-    load_model: str = None,
-    generator: Tuple[pd.DataFrame, pd.DataFrame] = None,
-    save: str = False,
-    n_estimators: int = 1000,
-    max_depth: int = 6,
-    loss: str = "squarederror",
-    learning_rate: float = 0.01,
-    save_path: str = None,
+def xgboost_train(
+    model: XGBRegressor,
+    generator: Tuple[pd.DataFrame, pd.DataFrame],
+    parameters: Dict[str, Any],
 ) -> XGBRegressor:
     """
-    Train or load an XGBoost model for stores sales forecasting.
+    Train the XGBoost model.
 
     Args:
-        train (bool, optional): Whether to train the model. Defaults to False.
-        load_model (str, optional): The name of the model to load. Defaults to None.
-        generator (Tuple[TimeseriesGenerator], optional): The generator used for training the model.
-            Required if train=True. Defaults to None.
-        save (str, optional): Whether to save the trained model. Defaults to False.
-        epochs (int, optional): The number of training epochs. Defaults to 1.
-        max_depth (int, optional): Max tree depth. Defaults to 6.
-        n_estimators (str, optional): The number of boosting rounds. Defaults to "000.
-        loss (str, optional): The loss function to use. Defaults to "squarederror".
-        learning_rate (float, optional): The learning rate for training. Defaults to 0.01.
-        save_path (str, optional): The path to save the trained model. Defaults to None.
+        model (XGBRegressor): The XGBoost model.
+        generator (Tuple[pd.DataFrame, pd.DataFrame]): The data generator containing the input data and target data.
+        parameters (Dict[str, Any]): The parameters to be passed to the XGBoost model.
 
     Returns:
-        XGBRegressor: The trained or loaded XGBoost model.
+        XGBRegressor: The trained XGBoost model.
     """
-    if not train and not load_model:
-        raise ValueError("You must either train or load a model")
-
-    if train and generator is None:
-        raise ValueError("You must provide a generator if you want to train a model")
-
-    if load_model:
-        model = pickle.load(
-            open(f"{pathlib.Path(save_path).absolute()}/{load_model}.h5", "rb")
-        )
-    else:
-        model = build_xgboost(n_estimators, max_depth, loss, learning_rate)
-
-    if train:
-        model.fit(*generator, eval_set=[generator], eval_metric=["rmse"], verbose=True)
-
-    if save:
-        model_name = f'xgboost {str(datetime.now(timezone.utc)).split(".")[0]}'
-
-        pickle.dump(
-            model, open(f"{pathlib.Path(save_path).absolute()}/{model_name}.h5", "wb")
-        )
-
-        print(f"Model saved as {model_name}")
+    model.fit(*generator, **parameters)
 
     return model
+
+
+def xgboost_cross_validation_train(
+    model: XGBRegressor,
+    generator: Tuple[pd.DataFrame, pd.DataFrame],
+    parameters: Dict[str, Any],
+) -> float:
+    """
+    Cross validate the XGBoost model.
+
+    Args:
+        model (XGBRegressor): The XGBoost model to be cross-validated.
+        generator (Tuple[pd.DataFrame, pd.DataFrame]): A tuple containing the training and validation data.
+        parameters (Dict[str, Any]): Additional parameters for the XGBoost model.
+
+    Returns:
+        Tuple[XGBRegressor, float]: A tuple containing the trained XGBoost model and the average mean squared error.
+    """
+    logs = {
+        "split": 1,
+        "pred_log": [],
+        "target_log": [],
+        "mse_log": [],
+    }
+
+    df = pd.merge(generator[0], generator[1], left_index=True, right_index=True)
+    n_splits = int((1 // 0.1) - 1)  # 10% test size
+    time_series_split = TimeSeriesSplit(n_splits=n_splits, gap=24)
+
+    for i_train, i_val in time_series_split.split(df):
+        train = df.iloc[i_train]
+        val = df.iloc[i_val]
+
+        train_in = train.drop(columns=["sales"])
+        train_out = train["sales"]
+        val_in = val.drop(columns=["sales"])
+        val_out = val["sales"]
+
+        model.fit(
+            train_in,
+            train_out,
+            eval_set=[(train_in, train_out), (val_in, val_out)],
+            **parameters,
+        )
+
+        logs["target_log"].extend(list(val_out))
+
+        pred = model.predict(val_in)
+        logs["pred_log"].extend(list(pred))
+
+        mse = mean_squared_error(val_out, pred)
+        logs["mse_log"].append((f'split {logs["split"]}', mse))
+
+        logs["split"] += 1
+
+    avg_mse = mean_squared_error(logs["target_log"], logs["pred_log"])
+
+    return avg_mse

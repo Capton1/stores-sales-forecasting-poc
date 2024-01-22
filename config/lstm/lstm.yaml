@@ -8,4 +8,4 @@ default:
   look_back: 30
   type: simple # multivariate or simple
   _name: lstm
-  save_path: models/lstm
+  save_path: models_save/lstm

@@ -163,7 +163,7 @@ def get_dmatrix(X: pd.DataFrame, y: pd.DataFrame) -> DMatrix:
     return DMatrix(X, label=y)
 
 
-def get_prophet_df(df: pd.DataFrame) -> pd.DataFrame:
+def get_prophet_df(df: pd.DataFrame, df2: pd.DataFrame = None) -> pd.DataFrame:
     """
     Create a DataFrame with the required columns for Prophet.
 
@@ -173,7 +173,12 @@ def get_prophet_df(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The DataFrame with the required columns for Prophet.
     """
+
     df["date"] = df.index
+    if df2 is not None:
+        df2["date"] = df2.index
+        df = pd.concat([df, df2], axis=0)
+
     return df[["date", "sales"]].rename(columns={"date": "ds", "sales": "y"})
 
 

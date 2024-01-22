@@ -1,23 +1,11 @@
 import pathlib
-import pickle
-from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 import pandas as pd
 from keras.layers import LSTM, Activation, Concatenate, Dense, Input
 from keras.models import Model, Sequential
-from keras.preprocessing.sequence import TimeseriesGenerator
-from scikeras.wrappers import KerasRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer
 from tensorflow.keras.layers import LSTM, Activation, Dense
 from tensorflow.keras.models import Sequential
-
-from models.training_helpers import (
-    build_lstm_generator,
-    get_multiple_input_timeseries_generator,
-    get_single_input_timeseries_generator,
-)
 
 
 def _build_simple_lstm(
@@ -103,89 +91,6 @@ def _build_multivariate_lstm(
     return model
 
 
-def lstm(
-    train: bool = False,
-    load_model: str = None,
-    generator: Tuple[TimeseriesGenerator] = None,
-    save: str = False,
-    epochs: int = 1,
-    batch_size: int = 64,
-    optimizer: str = "adam",
-    loss: str = "mse",
-    look_back: int = 30,
-    type: str = "simple",
-    save_path: str = None,
-) -> Model:
-    """
-    LSTM model for training or loading a pre-trained model.
-
-    Args:
-        train (bool, optional): Flag indicating whether to train the model. Defaults to False.
-        load_model (bool, optional): Flag indicating whether to load a pre-trained model. Defaults to False.
-        generator (TimeseriesGenerator, optional): The generator used for training the model. Required if train=True. Defaults to None.
-        save (bool, optional): Flag indicating whether to save the trained model. Defaults to False.
-        epochs (int, optional): Number of epochs for training the model. Defaults to 1.
-        batch_size (int, optional): Batch size for training the model. Defaults to 64.
-        optimizer (str, optional): Optimizer for the model. Defaults to "adam".
-        loss (str, optional): Loss function for the model. Defaults to "mse".
-        save_path (str, optional): Path to save the trained model. Required if save=True. Defaults to None.
-
-    Raises:
-        ValueError: Raised when neither train nor load_model is True.
-        ValueError: Raised when train is True but generator is not provided.
-
-    Returns:
-        Sequential: The trained or loaded LSTM model.
-    """
-    if not train and not load_model:
-        raise ValueError("You must either train or load a model")
-
-    if train and generator is None:
-        raise ValueError("You must provide a generator if you want to train a model")
-
-    if load_model:
-        model = pickle.load(
-            open(f"{pathlib.Path(save_path).absolute()}/{load_model}.h5", "rb")
-        )
-    else:
-        if type == "simple":
-            # input shape is look_back *  number of features
-            model = _build_simple_lstm(
-                (look_back, generator[0][0].data.shape[2]),  # (30, 64)
-                optimizer,
-                loss,
-            )
-        elif type == "multivariate":
-            # continuous and categorical data are separated in the generator
-            model = _build_multivariate_lstm(
-                (look_back, generator[0][0][0].data.shape[2]),  # (30, 3)
-                (look_back, generator[0][0][1].data.shape[2]),  # (30, 61)
-                optimizer,
-                loss,
-            )
-        else:
-            raise ValueError("Model type not found")
-
-    if train:
-        model.fit(
-            generator,
-            epochs=epochs,
-            batch_size=batch_size,
-            steps_per_epoch=len(generator),
-        )
-
-    if save:
-        model_name = f'{type} {str(datetime.now(timezone.utc)).split(".")[0]}'
-
-        pickle.dump(
-            model, open(f"{pathlib.Path(save_path).absolute()}/{model_name}.h5", "wb")
-        )
-
-        print(f"Model saved as {model_name}")
-
-    return model
-
-
 def build_lstm(
     input_shape, model_config: Dict[str, Any], load_model_name: str = None
 ) -> Model:
@@ -218,23 +123,33 @@ def build_lstm(
     )
 
 
-def get_lstm_training_pipeline(
-    model_config: Dict[str, Any], save=False, load_model=None, input_shape=None
-) -> Pipeline:
-    if load_model and not input_shape:
-        raise ValueError("You must provide an input shape if you want to load a model")
+def lstm_train(
+    model: Model,
+    generator: Tuple[pd.DataFrame, pd.DataFrame],
+    parameters: Dict[str, Any],
+) -> Model:
+    """
+    Train the LSTM model.
 
-    lstm = Pipeline(
-        steps=[
-            (
-                "lstm",
-                KerasRegressor(
-                    build_fn=build_lstm(input_shape, model_config, load_model),
-                    epochs=model_config["epochs"],
-                    batch_size=model_config["batch_size"],
-                ),
-            ),
-        ]
-    )
+    Args:
+        model (Model): The LSTM model.
+        generator (Tuple[pd.DataFrame, pd.DataFrame]): The data generator containing the input data and target data.
+        parameters (Dict[str, Any]): The parameters to be passed to the LSTM model.
 
-    return lstm
+    Returns:
+        Model: The trained LSTM model.
+    """
+    model.fit(generator, **parameters)
+    return model
+
+
+def lstm_cross_validation_train(
+    model: Model,
+    generator: Tuple[pd.DataFrame, pd.DataFrame],
+    parameters: Dict[str, Any],
+) -> float:
+    """
+    Cross validate the LSTM model.
+    """
+    model.fit(generator, **parameters)
+    return 1234.5

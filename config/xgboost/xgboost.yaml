@@ -1,12 +1,12 @@
 default:
   fit_params:
-    early_stopping_rounds: 100
-    eval_metric: rmse
-    verbose: 100
+    verbose: True
   build_params:
     loss: squarederror
     learning_rate: 0.01
     max_depth: 6
     n_estimators: 10000
+    eval_metric: rmse
+    early_stopping_rounds: 100
   _name: xgboost
-  save_path: models/xgboost
+  save_path: models_save/xgboost

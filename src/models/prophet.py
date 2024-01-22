@@ -1,26 +1,21 @@
 import pathlib
 import pickle
-from datetime import datetime, timezone
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import pandas as pd
 from prophet import Prophet
-from prophet.diagnostics import performance_metrics
+from prophet.diagnostics import cross_validation, performance_metrics
+from sklearn.metrics import mean_squared_error
 
 
-def _build_prophet(growth: str) -> Prophet:
+def _build_prophet(parameters: Dict[str, str]) -> Prophet:
     """
     Build a Prophet model.
 
     Returns:
         Prophet: The Prophet model.
     """
-    return Prophet(growth=growth)
-
-
-from typing import Any, Dict
-
-from prophet import Prophet
+    return Prophet(**parameters)
 
 
 def build_prophet(model_config: Dict[str, Any], load_model_name: str = None) -> Prophet:
@@ -42,51 +37,33 @@ def build_prophet(model_config: Dict[str, Any], load_model_name: str = None) -> 
             )
         )
 
-    return _build_prophet(**model_config["build_params"])
+    return _build_prophet(model_config["build_params"])
 
 
-def prophet(
-    train: bool = False,
-    load_model: str = None,
-    generator: pd.DataFrame = None,
-    save: str = False,
-    save_path: str = None,
-) -> Prophet:
+def prophet_train(model: Prophet, generator: pd.DataFrame) -> Prophet:
     """
-    Train or load a Prophet model for stores sales forecasting.
+    Train the Prophet model.
 
     Args:
-        train (bool, optional): Whether to train the model. Defaults to False.
-        load_model (str, optional): The name of the model to load. Defaults to None.
-        generator (Tuple[TimeseriesGenerator], optional): The generator used for training the model.
-            Required if train=True. Defaults to None.
-        save (str, optional): Whether to save the trained model. Defaults to False.
-        save_path (str, optional): The path to save the trained model. Defaults to None.
+        model (Prophet): The Prophet model.
+        generator (pd.DataFrame): The data generator.
 
     Returns:
-        Prophet: The trained or loaded Prophet model.
+        Prophet: The trained Prophet model.
     """
-    if not train and not load_model:
-        raise ValueError("You must either train or load a model")
-
-    if train and generator is None:
-        raise ValueError("You must provide a generator if you want to train a model")
-
-    if load_model:
-        model = pickle.load(
-            open(f"{pathlib.Path(save_path).absolute()}/{load_model}.h5", "rb")
-        )
-    else:
-        model = Prophet()
-
-    if train:
-        model.fit(generator)
-
-    if save:
-        model_name = f'prophet {str(datetime.now(timezone.utc)).split(".")[0]}'
-
-        pickle.dump(model, open(f"{save_path}/{model_name}.h5", "wb"))
-
-        print(f"Model saved as {model_name}")
-
+    model.fit(generator)
     return model
+
+
+def prophet_cross_validation_train(model: Prophet, generator: pd.DataFrame) -> float:
+    """
+    Cross validate the Prophet model.
+    """
+    model.fit(generator)
+
+    # means that we cut off the first 3 years of data from the training set, and always make predictions 90 days into the future.
+    df_cv = cross_validation(
+        model, initial="1096 days", period="90 days", horizon="90 days"
+    )
+
+    return mean_squared_error(df_cv.y, df_cv.yhat)
