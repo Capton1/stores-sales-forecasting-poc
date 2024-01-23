@@ -4,3 +4,10 @@ default:
     changepoint_prior_scale: 0.05
     seasonality_prior_scale: 10.0
   _name: prophet
+
+changepoint_prior_scale_0_5:
+  build_params:
+    seasonality_mode: additive
+    changepoint_prior_scale: 0.5
+    seasonality_prior_scale: 10.0
+  _name: prophet

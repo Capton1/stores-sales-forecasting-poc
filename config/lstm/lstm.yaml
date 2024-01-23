@@ -5,6 +5,7 @@ default_simple:
   build_params:
     optimizer: adam
     loss: mse
+    learning_rate: 0.1
   look_back: 30
   type: simple # multivariate or simple
   _name: lstm
@@ -16,6 +17,45 @@ default_multivariate:
   build_params:
     optimizer: adam
     loss: mse
+    learning_rate: 0.1
   look_back: 30
   type: multivariate # multivariate or simple
+  _name: lstm
+
+multivariate_batch_size_32_look_back_15:
+  fit_params:
+    batch_size: 32
+    epochs: 30
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.1
+  look_back: 15
+  type: multivariate # multivariate or simple
+  _name: lstm
+
+simple_batch_size_128_look_back_5:
+  fit_params:
+    batch_size: 32
+    epochs: 30
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.1
+  look_back: 5
+  type: simple # multivariate or simple
+  _name: lstm
+
+simple_default_l1_0_01_l2_0_01:
+  fit_params:
+    batch_size: 32
+    epochs: 30
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.1
+    l1: 0.01
+    l2: 0.01
+  look_back: 30
+  type: simple # multivariate or simple
   _name: lstm

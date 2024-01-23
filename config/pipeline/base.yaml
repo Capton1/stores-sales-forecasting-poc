@@ -3,7 +3,11 @@ validation:
     xgboost:
       - xgboost default - 2024-01-22 12:11:45
     lstm:
-      #- lstm default_multivariate - 2024-01-22 13:06:43
+      - lstm default_multivariate - 2024-01-22 13:06:43
       - lstm default_simple - 2024-01-22 11:27:38
+      - lstm simple_batch_size_128_look_back_5 - 2024-01-23 09:34:14
+      - lstm simple_default_l1_0_01_l2_0_01 - 2024-01-23 10:20:43
+
     prophet:
       - prophet default - 2024-01-22 11:22:01
+      - prophet changepoint_prior_scale_0_5 - 2024-01-23 10:40:15

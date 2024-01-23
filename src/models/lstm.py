@@ -7,10 +7,11 @@ from keras.layers import LSTM, Activation, Concatenate, Dense, Input
 from keras.models import Model, Sequential
 from tensorflow.keras.layers import LSTM, Activation, Dense
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.regularizers import L1L2
 
 
 def _build_simple_lstm(
-    input_shape: Tuple[int, int], optimizer: str, loss: str
+    input_shape: Tuple[int, int], optimizer: str, loss: str, reg: L1L2 = None
 ) -> Sequential:
     """
     Build a simple LSTM model.
@@ -32,6 +33,7 @@ def _build_simple_lstm(
             input_shape=input_shape,
             return_sequences=False,
             dropout=0.2,
+            kernel_regularizer=reg,
         )
     )
     model.add(Dense(1))
@@ -50,6 +52,7 @@ def _build_multivariate_lstm(
     input_shape_categorical: Tuple[int, int],
     optimizer: str,
     loss: str,
+    reg: L1L2 = None,
 ) -> Model:
     """
     Build a multivariate LSTM model.
@@ -67,7 +70,8 @@ def _build_multivariate_lstm(
     input_continuous = Input(shape=input_shape_continuous)
     input_categorical = Input(shape=input_shape_categorical)
 
-    lstm_layer = LSTM(50, activation="relu", return_sequences=True, dropout=0.2)(
+    lstm_layer = LSTM(50, activation="relu", return_sequences=True, dropout=0.2, kernel_regularizer=reg,
+)(
         input_continuous
     )
     lstm_layer = Dense(1)(lstm_layer)
@@ -91,6 +95,23 @@ def _build_multivariate_lstm(
 
     return model
 
+def build_regularization(model_config: Dict[str, Any]) -> L1L2:
+    """
+    Build the regularization object for the LSTM model.
+
+    Args:
+        model_config (dict): The configuration parameters for the model.
+
+    Returns:
+        L1L2: The regularization object.
+    """
+    if model_config["build_params"]["l1"] and model_config["build_params"]["l2"]:
+        return L1L2(l1=model_config["build_params"]["l1"], l2=model_config["build_params"]["l2"])
+    elif model_config["build_params"]["l1"]:
+        return L1L2(l1=model_config["build_params"]["l1"])
+    elif model_config["build_params"]["l2"]:
+        return L1L2(l2=model_config["build_params"]["l2"])
+    return None
 
 def build_lstm(
     input_shape, model_config: Dict[str, Any], load_model_name: str = None
@@ -112,17 +133,21 @@ def build_lstm(
                 "rb",
             )
         )
+        
+    reg = build_regularization(model_config)
 
     if model_config["type"] == "simple":
         return _build_simple_lstm(
             input_shape,
             model_config["build_params"]["optimizer"],
             model_config["build_params"]["loss"],
+            reg=reg,
         )
     return _build_multivariate_lstm(
         *input_shape,
         model_config["build_params"]["optimizer"],
         model_config["build_params"]["loss"],
+        reg=reg,
     )
 
 
@@ -154,5 +179,5 @@ def lstm_cross_validation_train(
     """
     Cross validate the LSTM model.
     """
-    model.fit(generator, **parameters)
-    return 1234.5
+    h = model.fit(generator, **parameters)
+    return h.history["loss"][-1]

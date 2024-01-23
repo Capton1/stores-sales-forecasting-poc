@@ -74,7 +74,7 @@ class Factory:
             raise ValueError("Data not found. Please fit the data first")
 
         if self.model_config is None:
-            self.model_config = model_config
+            self.model_config = dict(model_config)
             self.fit_params = (
                 dict(model_config["fit_params"])
                 if "fit_params" in model_config
@@ -197,8 +197,10 @@ class Factory:
             if data is not None:
                 self.input_data_shape = data.shape
             else:
+                # concatenate the last `look_back` days of the training set to the validation set in order to predict the first day of the validation set
+                val_lstm = pd.concat([self.train_df[-self.model_config["look_back"]:], self.val_df])
                 data, shape = build_lstm_generator(
-                    self.val_df, self.model_config, self.data_config["target"]
+                    val_lstm, self.model_config, self.data_config["target"]
                 )
                 self.input_data_shape = shape
             return self.model.predict(data)
@@ -335,23 +337,14 @@ def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
     if model_type == "lstm":
         config["type"] = "simple" if "simple" in model_name else "multivariate"
         config["look_back"] = 30
-        
-        f.load_model(model_name, config)
-        y_val = f.get_y_val()[config["look_back"]:]
-        
-        trained = f.get_df()[0].drop(columns=["sales"])
-        n_features = len(trained.columns)
-        trained = trained[-config["look_back"]:].to_numpy().astype("float32")
-        pred, curr_batch = [], trained.reshape((1, config["look_back"], n_features))
-        for i in range(len(y_val)):
-            curr_pred = f.predict(curr_batch)[0]
-            pred.append(curr_pred)
-            curr_batch = np.append(curr_batch[:, 1:, :], [[curr_pred]], axis=1)
-    else:
-        f.load_model(model_name, config)
-        y_val =  f.get_y_val()
-        pred = f.predict()
-        
+
+    f.load_model(model_name, config)
+    y_val =  f.get_y_val()
+    pred = f.predict()
+    
+    if model_type == "lstm" and config["type"] == "multivariate":
+        pred = pred[:, -1]
+
     mse = round(mean_squared_error(y_val, pred), 2)
 
     return mse
