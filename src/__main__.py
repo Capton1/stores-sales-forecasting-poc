@@ -1,4 +1,5 @@
 import os
+import mlflow
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import sys  # noqa
@@ -18,6 +19,11 @@ def main(config_files: Namespace):
         pipeline_config=config_files.pipeline_config,
     )
 
+    mlflow.set_tracking_uri('http://0.0.0.0:5000')
+    e = mlflow.set_experiment(config['data']['mlflow_experiment_name'])
+
+    mlflow.start_run(experiment_id=e.experiment_id)
+
     launch_pipeline(
         config,
         config_files.model,
@@ -29,6 +35,8 @@ def main(config_files: Namespace):
         validate=config_files.eval,
         limit=config_files.limit,
     )
+    
+    mlflow.end_run()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import math
-import numpy as np
+import mlflow
+from mlflow.models.signature import infer_signature
 import pathlib
 import pickle
 from datetime import datetime, timezone
@@ -231,21 +232,33 @@ class Factory:
 
         return self
 
-    def save_model(self):
+    def save_model(self, use_mlflow: bool = True):
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
 
         model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0]}'
 
-        pickle.dump(
-            self.model,
-            open(
-                f"{pathlib.Path(self.data_config['paths']['models'][self.model_config['_name']]).absolute()}/{model_name}.h5",
-                "wb",
-            ),
-        )
+        if self.model_config["_name"] == "lstm":
+            mlflow.tensorflow.log_model(self.model, artifact_path="model", registered_model_name=model_name)
+        elif self.model_config["_name"] == "xgboost":
+            mlflow.sklearn.log_model(self.model, artifact_path="model", registered_model_name=model_name)
+        else:
+            mlflow.prophet.log_model(self.model, artifact_path="model", registered_model_name=model_name)
+        
+        mlflow.set_tags({"model_type": self.model_config["_name"]})
+        mlflow.log_param("model_config", self.model_config)
+        mlflow.log_metric("MSE", self.val_mse)
+            
+        if not use_mlflow:            
+            pickle.dump(
+                self.model,
+                open(
+                    f"{pathlib.Path(self.data_config['paths']['models'][self.model_config['_name']]).absolute()}/{model_name}.h5",
+                    "wb",
+                ),
+            )
 
-        print(f"Model saved as {model_name}")
+            print(f"Model saved as {model_name}")
 
         return self
 

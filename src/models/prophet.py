@@ -1,5 +1,6 @@
 import pathlib
 import pickle
+import mlflow
 from typing import Any, Dict
 
 import pandas as pd
@@ -18,7 +19,7 @@ def _build_prophet(parameters: Dict[str, str]) -> Prophet:
     return Prophet(**parameters)
 
 
-def build_prophet(model_config: Dict[str, Any], load_model_name: str = None) -> Prophet:
+def build_prophet(model_config: Dict[str, Any], load_model_name: str = None, use_mlflow = True) -> Prophet:
     """
     Builds a Prophet model based on the given configuration.
 
@@ -30,12 +31,14 @@ def build_prophet(model_config: Dict[str, Any], load_model_name: str = None) -> 
         Prophet: The built Prophet model.
     """
     if load_model_name:
-        return pickle.load(
-            open(
-                f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                "rb",
+        if not mlflow:
+            return pickle.load(
+                open(
+                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+                    "rb",
+                )
             )
-        )
+        return mlflow.prophet.load_model(load_model_name)
 
     return _build_prophet(model_config["build_params"])
 
@@ -63,7 +66,7 @@ def prophet_cross_validation_train(model: Prophet, generator: pd.DataFrame) -> f
 
     # means that we cut off the first 3 years of data from the training set, and always make predictions 90 days into the future.
     df_cv = cross_validation(
-        model, initial="1096 days", period="90 days", horizon="90 days"
+        model, initial="1096 days", period="90 days", horizon="90 days", disable_tqdm=True
     )
 
     return mean_squared_error(df_cv.y, df_cv.yhat)

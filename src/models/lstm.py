@@ -1,6 +1,7 @@
 import pathlib
 import pickle
 from typing import Any, Dict, Tuple
+import mlflow
 
 import pandas as pd
 from keras.layers import LSTM, Activation, Concatenate, Dense, Input
@@ -105,16 +106,16 @@ def build_regularization(model_config: Dict[str, Any]) -> L1L2:
     Returns:
         L1L2: The regularization object.
     """
-    if model_config["build_params"]["l1"] and model_config["build_params"]["l2"]:
+    if "l1" in model_config["build_params"] and "l2" in model_config["build_params"]:
         return L1L2(l1=model_config["build_params"]["l1"], l2=model_config["build_params"]["l2"])
-    elif model_config["build_params"]["l1"]:
+    elif "l1" in model_config["build_params"]:
         return L1L2(l1=model_config["build_params"]["l1"])
-    elif model_config["build_params"]["l2"]:
+    elif "l2" in model_config["build_params"]:
         return L1L2(l2=model_config["build_params"]["l2"])
     return None
 
 def build_lstm(
-    input_shape, model_config: Dict[str, Any], load_model_name: str = None
+    input_shape, model_config: Dict[str, Any], load_model_name: str = None, use_mlflow: bool = True
 ) -> Model:
     """
     Build an LSTM model based on the given input shape and model configuration.
@@ -127,12 +128,15 @@ def build_lstm(
         Model: The built LSTM model.
     """
     if load_model_name:
-        return pickle.load(
-            open(
-                f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                "rb",
+        if not use_mlflow:
+            return pickle.load(
+                open(
+                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+                    "rb",
+                )
             )
-        )
+        return mlflow.keras.load_model(load_model_name)
+
         
     reg = build_regularization(model_config)
 

@@ -1,6 +1,7 @@
 import pathlib
 import pickle
 from typing import Any, Dict, Tuple
+import mlflow
 
 import pandas as pd
 from sklearn.metrics import mean_squared_error
@@ -38,7 +39,7 @@ def _build_xgboost(
 
 
 def build_xgboost(
-    model_config: Dict[str, Any], load_model_name: str = None
+    model_config: Dict[str, Any], load_model_name: str = None, use_mlflow = True
 ) -> XGBRegressor:
     """
     Build an XGBoost model.
@@ -50,12 +51,14 @@ def build_xgboost(
         XGBRegressor: The XGBoost model.
     """
     if load_model_name:
-        return pickle.load(
-            open(
-                f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                "rb",
+        if not use_mlflow:
+            return pickle.load(
+                open(
+                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+                    "rb",
+                )
             )
-        )
+        return mlflow.xgboost.load_model(load_model_name)
 
     return _build_xgboost(**model_config["build_params"])
 
