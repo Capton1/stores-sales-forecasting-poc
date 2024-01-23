@@ -4,4 +4,3 @@ default:
     changepoint_prior_scale: 0.05
     seasonality_prior_scale: 10.0
   _name: prophet
-  save_path: models_save/prophet

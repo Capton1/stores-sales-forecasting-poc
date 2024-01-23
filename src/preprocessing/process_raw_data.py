@@ -156,7 +156,7 @@ def one_hot_encode_df(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: encoded df
     """
-    return pd.get_dummies(df, columns=features)
+    return pd.get_dummies(df, columns=features, dtype="bool")
 
 
 def group_by_date(df: pd.DataFrame, mean=[], sum=[]) -> pd.DataFrame:

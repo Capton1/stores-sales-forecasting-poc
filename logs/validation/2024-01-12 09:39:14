@@ -1,4 +1,0 @@
-Type: xgboost - Name: xgboost 2024-01-12 09:37:02 - MSE: 27751435187.32 
-Type: lstm - Name: multivariate 2024-01-12 09:29:03 - MSE: 429768788104.03 
-Type: lstm - Name: simple 2024-01-12 09:35:35 - MSE: 675290248129.67 
-Type: prophet - Name: prophet 2024-01-12 09:37:16 - MSE: 21552667962.21 

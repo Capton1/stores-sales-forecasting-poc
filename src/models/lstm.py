@@ -1,4 +1,5 @@
 import pathlib
+import pickle
 from typing import Any, Dict, Tuple
 
 import pandas as pd
@@ -105,9 +106,11 @@ def build_lstm(
         Model: The built LSTM model.
     """
     if load_model_name:
-        return open(
-            f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-            "rb",
+        return pickle.load(
+            open(
+                f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
+                "rb",
+            )
         )
 
     if model_config["type"] == "simple":

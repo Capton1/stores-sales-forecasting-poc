@@ -21,6 +21,78 @@ def get_features_and_target(
     return df.drop([target], axis=1), df[[target]]
 
 
+def create_date_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create additional date-related features in the given DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the date index.
+
+    Returns:
+        pd.DataFrame: The DataFrame with additional date features.
+    """
+
+    df["month"] = df.index.month.astype("int8")
+    df["day_of_month"] = df.index.day.astype("int8")
+    df["day_of_year"] = df.index.dayofyear.astype("int16")
+    df["week_of_month"] = (
+        df.index.to_series().apply(lambda d: (d.day - 1) // 7 + 1)
+    ).astype("int8")
+    df["week_of_year"] = (df.index.isocalendar().week).astype("int8")
+    df["day_of_week"] = (df.index.dayofweek + 1).astype("int8")
+    df["year"] = df.index.year.astype("int32")
+    df["is_wknd"] = (df.index.weekday // 4).astype("int8")
+    df["is_month_start"] = df.index.is_month_start.astype("int8")
+    df["is_month_end"] = df.index.is_month_end.astype("int8")
+    df["is_year_start"] = df.index.is_year_start.astype("int8")
+    df["is_year_end"] = df.index.is_year_end.astype("int8")
+
+    # 0: Winter - 1: Spring - 2: Summer - 3: Fall
+    df["season"] = np.where(df.month.isin([12, 1, 2]), 0, 1)
+    df["season"] = np.where(df.month.isin([6, 7, 8]), 2, df["season"])
+    df["season"] = np.where(df.month.isin([9, 10, 11]), 3, df["season"])
+
+    return df
+
+
+def get_simple_mov_avg(
+    df: pd.DataFrame, window: int = 7, column="sales"
+) -> pd.DataFrame:
+    """
+    Create a simple moving average feature in the given DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the target variable.
+        window (int, optional): The window size for the moving average. Defaults to 7.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the additional moving average feature.
+    """
+    x = df[column].rolling(window=window, min_periods=1).mean()
+    return x
+
+
+def generate_ml_features(
+    df: pd.DataFrame, target: str = "sales"
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Generate machine learning features from the given DataFrame.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        target (str, optional): The target variable. Defaults to "sales".
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the feature DataFrame (X) and the target DataFrame (y).
+    """
+    X, y = get_features_and_target(df, target=target)
+
+    X = create_date_features(X)
+    X["sales_mov_avg"] = get_simple_mov_avg(df, window=7, column=target)
+
+    return X, y
+
+
 def get_single_input_timeseries_generator(
     X: pd.DataFrame, y: pd.DataFrame, look_back: int, batch_size: int = 1
 ) -> TimeseriesGenerator:
@@ -198,6 +270,9 @@ def build_lstm_generator(
     Raises:
         ValueError: If the model type is unknown.
     """
+    if "look_back" not in model_config:
+        model_config["look_back"] = 30
+
     X, y = get_features_and_target(df, target=target)
 
     if model_config["type"] == "simple":
@@ -206,7 +281,7 @@ def build_lstm_generator(
         ), (model_config["look_back"], X.shape[1])
     elif model_config["type"] == "multivariate":
         X_continuous = X.select_dtypes(include=["number"])
-        X_categorical = X.select_dtypes(include=["object"])
+        X_categorical = X.select_dtypes(include=["bool"])
 
         return get_multiple_input_timeseries_generator(
             X_continuous, X_categorical, y, model_config["look_back"], batch_size=1

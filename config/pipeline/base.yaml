@@ -1,9 +1,9 @@
 validation:
   models:
     xgboost:
-      - xgboost 2024-01-12 09:37:02
+      - xgboost default - 2024-01-22 12:11:45
     lstm:
-      - multivariate 2024-01-12 09:29:03
-      - simple 2024-01-12 09:35:35
+      #- lstm default_multivariate - 2024-01-22 13:06:43
+      - lstm default_simple - 2024-01-22 11:27:38
     prophet:
-      - prophet 2024-01-12 09:37:16
+      - prophet default - 2024-01-22 11:22:01

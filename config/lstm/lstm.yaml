@@ -1,4 +1,4 @@
-default:
+default_simple:
   fit_params:
     batch_size: 64
     epochs: 20
@@ -8,4 +8,14 @@ default:
   look_back: 30
   type: simple # multivariate or simple
   _name: lstm
-  save_path: models_save/lstm
+
+default_multivariate:
+  fit_params:
+    batch_size: 64
+    epochs: 20
+  build_params:
+    optimizer: adam
+    loss: mse
+  look_back: 30
+  type: multivariate # multivariate or simple
+  _name: lstm

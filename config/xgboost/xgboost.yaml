@@ -9,4 +9,3 @@ default:
     eval_metric: rmse
     early_stopping_rounds: 100
   _name: xgboost
-  save_path: models_save/xgboost

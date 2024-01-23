@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import pathlib
 import pickle
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from sklearn.metrics import mean_squared_error
 from models.lstm import build_lstm, lstm_cross_validation_train
 from models.prophet import build_prophet, prophet_cross_validation_train
 from models.training_helpers import (build_lstm_generator,
-                                     get_features_and_target, get_prophet_df)
+                                     generate_ml_features, get_prophet_df)
 from models.xgboost import build_xgboost, xgboost_cross_validation_train
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import load_data, process_data
@@ -27,16 +28,27 @@ class Factory:
         self.train_generator = None  # possible type : TimeseriesGenerator, pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]
 
         self.model = None
+        self.input_data_shape = None
 
     def get_attributes(self):
         return self.__dict__
+
+    def get_df(self):
+        return self.train_df, self.val_df
 
     def set_model_config(self, model_config: Dict[str, Any]):
         self.model_config = model_config
         return self
 
+    def set_model_type(self, model_type: str):
+        self.model_config["_name"] = model_type
+        return self
+
     def get_model_config(self):
         return self.model_config
+
+    def get_model(self):
+        return self.model
 
     def get_y_val(self):
         return self.val_df[self.data_config["target"]]
@@ -45,13 +57,15 @@ class Factory:
         if self.train_df is not None:
             return self
 
+        print("Fitting data ...")
+
         try:
             self.df = process_data(X, data_config=self.data_config)
             self.train_df, self.val_df = train_val_split(
                 self.df, val_ratio=self.data_config["validation_ratio"]
             )
-        except:
-            raise ValueError("Unexpected error while processing data.")
+        except Exception as e:
+            raise ValueError("Unexpected error while processing data: ", e)
 
         return self
 
@@ -66,13 +80,12 @@ class Factory:
                 if "fit_params" in model_config
                 else None
             )
-
         if self.model_config["_name"] == "lstm":
             self.train_generator, self.input_data_shape = build_lstm_generator(
                 self.train_df, self.model_config, self.data_config["target"]
             )
         elif self.model_config["_name"] == "xgboost":
-            self.train_generator = get_features_and_target(
+            self.train_generator = generate_ml_features(
                 self.train_df, self.data_config["target"]
             )
         elif self.model_config["_name"] == "prophet":
@@ -87,6 +100,8 @@ class Factory:
             raise ValueError(
                 "Generator not found. Please fit the data first or load a model"
             )
+
+        self.model_config["save_path"] = self.data_config["paths"]["models"][self.model_config["_name"]]
 
         if self.model_config["_name"] == "lstm":
             self.model = build_lstm(
@@ -104,7 +119,7 @@ class Factory:
     def _fit_model(
         self,
         model_config: Dict[str, Any],
-        model_config_name: str,
+        model_config_name: str = "default",
         load_model_name: str = None,
     ):
         if self.train_df is None:
@@ -158,13 +173,15 @@ class Factory:
     def fit_model(
         self,
         model_config: Dict[str, Any],
-        model_config_name: str,
+        model_config_name: str = "default",
         load_model_name: str = None,
     ):
-        if not self.train_df:
+        if self.train_df is None:
             raise ValueError("Data not found. Please fit the data first")
 
-        self._fit_model(model_config, model_config_name, load_model_name)
+        self._fit_model(
+            model_config[model_config_name], model_config_name, load_model_name
+        )
 
         return self
 
@@ -177,17 +194,17 @@ class Factory:
             raise ValueError("Model not found. Please fit the data first")
 
         if self.model_config["_name"] == "lstm":
-            data = (
-                build_lstm_generator(
+            if data is not None:
+                self.input_data_shape = data.shape
+            else:
+                data, shape = build_lstm_generator(
                     self.val_df, self.model_config, self.data_config["target"]
                 )
-                if data is None
-                else data
-            )
+                self.input_data_shape = shape
             return self.model.predict(data)
         elif self.model_config["_name"] == "xgboost":
             data = (
-                get_features_and_target(self.val_df, self.data_config["target"])
+                generate_ml_features(self.val_df, self.data_config["target"])[0]
                 if data is None
                 else data
             )
@@ -201,11 +218,13 @@ class Factory:
             raise ValueError("Model not found")
 
     def load_model(self, load_model_name: str, model_config: Dict[str, Any] = None):
-        if not self.model_config:
-            if not model_config:
-                raise ValueError("Please provide model_config")
-            self.model_config = model_config
+        if not self.model_config and not model_config:
+            raise ValueError("Please provide model_config")
 
+        if ".h5" in load_model_name:
+            load_model_name = load_model_name.split(".")[0]
+
+        self.model_config = dict(model_config)
         self._build_model(load_model_name)
 
         return self
@@ -219,7 +238,7 @@ class Factory:
         pickle.dump(
             self.model,
             open(
-                f"{pathlib.Path(self.model_config['save_path']).absolute()}/{model_name}.h5",
+                f"{pathlib.Path(self.data_config['paths']['models'][self.model_config['_name']]).absolute()}/{model_name}.h5",
                 "wb",
             ),
         )
@@ -247,19 +266,23 @@ class Factory:
         return self
 
 
-def generate_datasets(data_config: Dict[str, Any], save: bool = False):
+def generate_datasets(data_config: Dict[str, Any], save: bool = False) -> Factory:
     """Generates train and validation sets.
 
     Args:
         data_path (Dict[str, Any]): paths to data
         save (bool, optional): whether to save the data. Defaults to False.
     """
+    print("Generating datasets ...")
+
     df = load_data(data_config["paths"])
     f = Factory(data_config)
     f.fit(df)
 
     if save:
         f.save_data()
+
+    return f
 
 
 def generate_models(
@@ -268,7 +291,7 @@ def generate_models(
     model_config_name: str,
     save: bool = False,
     load_model_name: str = None,
-):
+) -> Factory:
     """Generates models.
 
     Args:
@@ -287,6 +310,8 @@ def generate_models(
     if save:
         f.save_model()
 
+    return f
+
 
 def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
     """
@@ -300,11 +325,33 @@ def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
     Returns:
         float: The mean squared error of the model.
     """
-    print(f"Evaluating model {model_type} {model_name} ...")
+    print(f"Evaluating model {model_name} ...")
 
-    f.load_model(model_name, {"_name": model_type})
-    y_val = f.get_y_val()
-    pred = f.predict()
+    config = {
+        "_name": model_type,
+        "save_path": f.data_config["paths"]["models"][model_type],
+    }
+    
+    if model_type == "lstm":
+        config["type"] = "simple" if "simple" in model_name else "multivariate"
+        config["look_back"] = 30
+        
+        f.load_model(model_name, config)
+        y_val = f.get_y_val()[config["look_back"]:]
+        
+        trained = f.get_df()[0].drop(columns=["sales"])
+        n_features = len(trained.columns)
+        trained = trained[-config["look_back"]:].to_numpy().astype("float32")
+        pred, curr_batch = [], trained.reshape((1, config["look_back"], n_features))
+        for i in range(len(y_val)):
+            curr_pred = f.predict(curr_batch)[0]
+            pred.append(curr_pred)
+            curr_batch = np.append(curr_batch[:, 1:, :], [[curr_pred]], axis=1)
+    else:
+        f.load_model(model_name, config)
+        y_val =  f.get_y_val()
+        pred = f.predict()
+        
     mse = round(mean_squared_error(y_val, pred), 2)
 
     return mse
@@ -323,7 +370,7 @@ def validation_pipeline(
     Returns:
         None
     """
-    filename = f'Cross val - {str(datetime.now(timezone.utc)).split(".")[0]}'
+    filename = f'Validation - {str(datetime.now(timezone.utc)).split(".")[0]}'
     print(f"Writing validation results in `{filename}` ... \n")
 
     df = load_data(data_config["paths"])
@@ -337,7 +384,7 @@ def validation_pipeline(
     ) as file:
         for model_type, models in models_to_validate.items():
             for model_name in models:
-                mse = evaluate_model(f, df, model_type, model_name)
+                mse = evaluate_model(f, model_type, model_name)
                 file.write(f"Type: {model_type} - Name: {model_name} - MSE: {mse} \n")
 
                 if mse < min_mse:
