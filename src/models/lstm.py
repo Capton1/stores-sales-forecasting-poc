@@ -1,13 +1,11 @@
 import pathlib
 import pickle
 from typing import Any, Dict, Tuple
-import mlflow
 
+import mlflow
 import pandas as pd
 from keras.layers import LSTM, Activation, Concatenate, Dense, Input
 from keras.models import Model, Sequential
-from tensorflow.keras.layers import LSTM, Activation, Dense
-from tensorflow.keras.models import Sequential
 from tensorflow.keras.regularizers import L1L2
 
 
@@ -71,10 +69,13 @@ def _build_multivariate_lstm(
     input_continuous = Input(shape=input_shape_continuous)
     input_categorical = Input(shape=input_shape_categorical)
 
-    lstm_layer = LSTM(50, activation="relu", return_sequences=True, dropout=0.2, kernel_regularizer=reg,
-)(
-        input_continuous
-    )
+    lstm_layer = LSTM(
+        50,
+        activation="relu",
+        return_sequences=True,
+        dropout=0.2,
+        kernel_regularizer=reg,
+    )(input_continuous)
     lstm_layer = Dense(1)(lstm_layer)
     lstm_layer = Activation("linear")(lstm_layer)
     lstm_layer = Model(inputs=input_continuous, outputs=lstm_layer)
@@ -96,6 +97,7 @@ def _build_multivariate_lstm(
 
     return model
 
+
 def build_regularization(model_config: Dict[str, Any]) -> L1L2:
     """
     Build the regularization object for the LSTM model.
@@ -107,15 +109,21 @@ def build_regularization(model_config: Dict[str, Any]) -> L1L2:
         L1L2: The regularization object.
     """
     if "l1" in model_config["build_params"] and "l2" in model_config["build_params"]:
-        return L1L2(l1=model_config["build_params"]["l1"], l2=model_config["build_params"]["l2"])
+        return L1L2(
+            l1=model_config["build_params"]["l1"], l2=model_config["build_params"]["l2"]
+        )
     elif "l1" in model_config["build_params"]:
         return L1L2(l1=model_config["build_params"]["l1"])
     elif "l2" in model_config["build_params"]:
         return L1L2(l2=model_config["build_params"]["l2"])
     return None
 
+
 def build_lstm(
-    input_shape, model_config: Dict[str, Any], load_model_name: str = None, use_mlflow: bool = True
+    input_shape,
+    model_config: Dict[str, Any],
+    load_model_name: str = None,
+    use_mlflow: bool = True,
 ) -> Model:
     """
     Build an LSTM model based on the given input shape and model configuration.
@@ -137,7 +145,6 @@ def build_lstm(
             )
         return mlflow.pyfunc.load_model(f"models:/{load_model_name}/latest")
 
-        
     reg = build_regularization(model_config)
 
     if model_config["type"] == "simple":

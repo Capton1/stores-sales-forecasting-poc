@@ -1,11 +1,11 @@
 import pathlib
 import pickle
-import mlflow
 from typing import Any, Dict
 
+import mlflow
 import pandas as pd
 from prophet import Prophet
-from prophet.diagnostics import cross_validation, performance_metrics
+from prophet.diagnostics import cross_validation
 from sklearn.metrics import mean_squared_error
 
 
@@ -19,7 +19,9 @@ def _build_prophet(parameters: Dict[str, str]) -> Prophet:
     return Prophet(**parameters)
 
 
-def build_prophet(model_config: Dict[str, Any], load_model_name: str = None, use_mlflow = True) -> Prophet:
+def build_prophet(
+    model_config: Dict[str, Any], load_model_name: str = None, use_mlflow=True
+) -> Prophet:
     """
     Builds a Prophet model based on the given configuration.
 
@@ -66,7 +68,11 @@ def prophet_cross_validation_train(model: Prophet, generator: pd.DataFrame) -> f
 
     # means that we cut off the first 3 years of data from the training set, and always make predictions 90 days into the future.
     df_cv = cross_validation(
-        model, initial="1096 days", period="90 days", horizon="90 days", disable_tqdm=True
+        model,
+        initial="1096 days",
+        period="90 days",
+        horizon="90 days",
+        disable_tqdm=True,
     )
 
     return mean_squared_error(df_cv.y, df_cv.yhat)

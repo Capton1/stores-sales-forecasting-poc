@@ -1,23 +1,25 @@
 import math
-import mlflow
-import numpy as np
 import pathlib
 import pickle
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+import mlflow
+import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error
 
 from models.lstm import build_lstm, lstm_cross_validation_train
 from models.prophet import build_prophet, prophet_cross_validation_train
-from models.training_helpers import (build_lstm_generator,
-                                     generate_ml_features, get_prophet_df)
+from models.training_helpers import (
+    build_lstm_generator,
+    generate_ml_features,
+    get_prophet_df,
+)
 from models.xgboost import build_xgboost, xgboost_cross_validation_train
+from pipeline.helpers import convert_config_to_dict, get_config_from_model_name
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import load_data, process_data
-
-from pipeline.helpers import get_config_from_model_name, convert_config_to_dict
 
 
 class Factory:
@@ -98,13 +100,15 @@ class Factory:
 
         return self
 
-    def _build_model(self, load_model_name: str = None, use_mlflow = True):
+    def _build_model(self, load_model_name: str = None, use_mlflow=True):
         if self.train_generator is None and load_model_name is None:
             raise ValueError(
                 "Generator not found. Please fit the data first or load a model"
             )
 
-        self.model_config["save_path"] = self.data_config["paths"]["models"][self.model_config["_name"]]
+        self.model_config["save_path"] = self.data_config["paths"]["models"][
+            self.model_config["_name"]
+        ]
 
         if self.model_config["_name"] == "lstm":
             self.model = build_lstm(
@@ -201,12 +205,14 @@ class Factory:
                 self.input_data_shape = data.shape
             else:
                 # concatenate the last `look_back` days of the training set to the validation set in order to predict the first day of the validation set
-                val_lstm = pd.concat([self.train_df[-self.model_config["look_back"]:], self.val_df])
+                val_lstm = pd.concat(
+                    [self.train_df[-self.model_config["look_back"] :], self.val_df]
+                )
                 data, shape = build_lstm_generator(
                     val_lstm, self.model_config, self.data_config["target"]
                 )
                 self.input_data_shape = shape
-            
+
             res = []
             for x in data:
                 if self.model_config["type"] == "multivariate":
@@ -230,7 +236,9 @@ class Factory:
         else:
             raise ValueError("Model not found")
 
-    def load_model(self, load_model_name: str, model_config: Dict[str, Any] = None, use_mlflow = True):
+    def load_model(
+        self, load_model_name: str, model_config: Dict[str, Any] = None, use_mlflow=True
+    ):
         if not self.model_config and not model_config:
             raise ValueError("Please provide model_config")
 
@@ -249,17 +257,23 @@ class Factory:
         model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
 
         if self.model_config["_name"] == "lstm":
-            mlflow.tensorflow.log_model(self.model, artifact_path="model", registered_model_name=model_name)
+            mlflow.tensorflow.log_model(
+                self.model, artifact_path="model", registered_model_name=model_name
+            )
         elif self.model_config["_name"] == "xgboost":
-            mlflow.sklearn.log_model(self.model, artifact_path="model", registered_model_name=model_name)
+            mlflow.sklearn.log_model(
+                self.model, artifact_path="model", registered_model_name=model_name
+            )
         else:
-            mlflow.prophet.log_model(self.model, artifact_path="model", registered_model_name=model_name)
-        
+            mlflow.prophet.log_model(
+                self.model, artifact_path="model", registered_model_name=model_name
+            )
+
         mlflow.set_tags({"model_type": self.model_config["_name"]})
         mlflow.log_param("model_config", self.model_config)
         mlflow.log_metric("MSE", self.val_mse)
-            
-        if not use_mlflow:            
+
+        if not use_mlflow:
             pickle.dump(
                 self.model,
                 open(
@@ -338,7 +352,9 @@ def generate_models(
     return f
 
 
-def evaluate_model(f: Factory, model_type: str, model_name: str, model_config: Dict[str, Any]) -> float:
+def evaluate_model(
+    f: Factory, model_type: str, model_name: str, model_config: Dict[str, Any]
+) -> float:
     """
     Evaluates the given model.
 
@@ -351,14 +367,14 @@ def evaluate_model(f: Factory, model_type: str, model_name: str, model_config: D
         float: The mean squared error of the model.
     """
     print(f"Evaluating model {model_name} ...")
-    
+
     model_config["save_path"] = f.data_config["paths"]["models"][model_type]
 
     f.load_model(model_name, model_config)
-    y_val =  f.get_y_val()
+    y_val = f.get_y_val()
     pred = f.predict()
-    
-    #if model_type == "lstm" and model_config["type"] == "multivariate":
+
+    # if model_type == "lstm" and model_config["type"] == "multivariate":
     #    pred = pred[:, -1]
 
     mse = round(mean_squared_error(y_val, pred), 2)
@@ -366,9 +382,7 @@ def evaluate_model(f: Factory, model_type: str, model_name: str, model_config: D
     return mse
 
 
-def validation_pipeline(
-    models_to_validate: Dict[str, Any], config: Dict[str, Any]
-):
+def validation_pipeline(models_to_validate: Dict[str, Any], config: Dict[str, Any]):
     """
     Runs the validation pipeline for the given models and configuration.
 
@@ -380,7 +394,7 @@ def validation_pipeline(
         None
     """
     data_config = config["data"]
-    
+
     filename = f'Validation - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
     print(f"Writing validation results in `{filename}` ... \n")
 

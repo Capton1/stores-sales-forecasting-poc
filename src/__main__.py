@@ -1,10 +1,10 @@
 import os
+
 import mlflow
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import sys  # noqa
 from argparse import ArgumentParser, Namespace
-from typing import List
 
 from pipeline.factory import launch_pipeline
 
@@ -19,8 +19,8 @@ def main(config_files: Namespace):
         pipeline_config=config_files.pipeline_config,
     )
 
-    mlflow.set_tracking_uri('http://0.0.0.0:5000')
-    e = mlflow.set_experiment(config['data']['mlflow_experiment_name'])
+    mlflow.set_tracking_uri("http://0.0.0.0:5000")
+    e = mlflow.set_experiment(config["data"]["mlflow_experiment_name"])
 
     mlflow.start_run(experiment_id=e.experiment_id)
 
@@ -35,7 +35,7 @@ def main(config_files: Namespace):
         validate=config_files.eval,
         limit=config_files.limit,
     )
-    
+
     mlflow.end_run()
 
 

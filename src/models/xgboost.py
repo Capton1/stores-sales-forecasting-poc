@@ -1,8 +1,8 @@
 import pathlib
 import pickle
 from typing import Any, Dict, Tuple
-import mlflow
 
+import mlflow
 import pandas as pd
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
@@ -39,7 +39,7 @@ def _build_xgboost(
 
 
 def build_xgboost(
-    model_config: Dict[str, Any], load_model_name: str = None, use_mlflow = True
+    model_config: Dict[str, Any], load_model_name: str = None, use_mlflow=True
 ) -> XGBRegressor:
     """
     Build an XGBoost model.
