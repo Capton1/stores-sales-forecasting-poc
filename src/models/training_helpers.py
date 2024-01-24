@@ -270,9 +270,6 @@ def build_lstm_generator(
     Raises:
         ValueError: If the model type is unknown.
     """
-    if "look_back" not in model_config:
-        model_config["look_back"] = 30
-
     X, y = get_features_and_target(df, target=target)
 
     if model_config["type"] == "simple":

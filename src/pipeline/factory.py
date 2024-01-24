@@ -77,9 +77,9 @@ class Factory:
             raise ValueError("Data not found. Please fit the data first")
 
         if self.model_config is None:
-            self.model_config = model_config
+            self.model_config = dict(model_config)
             self.fit_params = (
-                model_config["fit_params"]
+                dict(model_config["fit_params"])
                 if "fit_params" in model_config
                 else None
             )
@@ -237,7 +237,7 @@ class Factory:
         if ".h5" in load_model_name:
             load_model_name = load_model_name.split(".")[0]
 
-        self.model_config = model_config
+        self.model_config = dict(model_config)
         self._build_model(load_model_name, use_mlflow)
 
         return self
