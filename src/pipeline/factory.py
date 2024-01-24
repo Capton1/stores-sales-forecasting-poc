@@ -1,6 +1,6 @@
 import math
 import mlflow
-from mlflow.models.signature import infer_signature
+import numpy as np
 import pathlib
 import pickle
 from datetime import datetime, timezone
@@ -16,6 +16,8 @@ from models.training_helpers import (build_lstm_generator,
 from models.xgboost import build_xgboost, xgboost_cross_validation_train
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import load_data, process_data
+
+from pipeline.helpers import get_config_from_model_name, convert_config_to_dict
 
 
 class Factory:
@@ -75,9 +77,9 @@ class Factory:
             raise ValueError("Data not found. Please fit the data first")
 
         if self.model_config is None:
-            self.model_config = dict(model_config)
+            self.model_config = model_config
             self.fit_params = (
-                dict(model_config["fit_params"])
+                model_config["fit_params"]
                 if "fit_params" in model_config
                 else None
             )
@@ -96,7 +98,7 @@ class Factory:
 
         return self
 
-    def _build_model(self, load_model_name: str = None):
+    def _build_model(self, load_model_name: str = None, use_mlflow = True):
         if self.train_generator is None and load_model_name is None:
             raise ValueError(
                 "Generator not found. Please fit the data first or load a model"
@@ -106,12 +108,12 @@ class Factory:
 
         if self.model_config["_name"] == "lstm":
             self.model = build_lstm(
-                self.input_data_shape, self.model_config, load_model_name
+                self.input_data_shape, self.model_config, load_model_name, use_mlflow
             )
         elif self.model_config["_name"] == "xgboost":
-            self.model = build_xgboost(self.model_config, load_model_name)
+            self.model = build_xgboost(self.model_config, load_model_name, use_mlflow)
         elif self.model_config["_name"] == "prophet":
-            self.model = build_prophet(self.model_config, load_model_name)
+            self.model = build_prophet(self.model_config, load_model_name, use_mlflow)
         else:
             raise ValueError("Model not found")
 
@@ -204,7 +206,14 @@ class Factory:
                     val_lstm, self.model_config, self.data_config["target"]
                 )
                 self.input_data_shape = shape
-            return self.model.predict(data)
+            
+            res = []
+            for x in data:
+                if self.model_config["type"] == "multivariate":
+                    res.append(self.model.predict((x[0][0], x[0][1]))[0][0])
+                else:
+                    res.append(self.model.predict(x[0])[0][0])
+            return res
         elif self.model_config["_name"] == "xgboost":
             data = (
                 generate_ml_features(self.val_df, self.data_config["target"])[0]
@@ -213,6 +222,7 @@ class Factory:
             )
             return self.model.predict(data)
         elif self.model_config["_name"] == "prophet":
+            print(type(self.model))
             future = self.model.make_future_dataframe(
                 periods=len(self.val_df), freq="D", include_history=False
             )
@@ -220,15 +230,15 @@ class Factory:
         else:
             raise ValueError("Model not found")
 
-    def load_model(self, load_model_name: str, model_config: Dict[str, Any] = None):
+    def load_model(self, load_model_name: str, model_config: Dict[str, Any] = None, use_mlflow = True):
         if not self.model_config and not model_config:
             raise ValueError("Please provide model_config")
 
         if ".h5" in load_model_name:
             load_model_name = load_model_name.split(".")[0]
 
-        self.model_config = dict(model_config)
-        self._build_model(load_model_name)
+        self.model_config = model_config
+        self._build_model(load_model_name, use_mlflow)
 
         return self
 
@@ -236,7 +246,7 @@ class Factory:
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
 
-        model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0]}'
+        model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
 
         if self.model_config["_name"] == "lstm":
             mlflow.tensorflow.log_model(self.model, artifact_path="model", registered_model_name=model_name)
@@ -328,7 +338,7 @@ def generate_models(
     return f
 
 
-def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
+def evaluate_model(f: Factory, model_type: str, model_name: str, model_config: Dict[str, Any]) -> float:
     """
     Evaluates the given model.
 
@@ -341,22 +351,15 @@ def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
         float: The mean squared error of the model.
     """
     print(f"Evaluating model {model_name} ...")
-
-    config = {
-        "_name": model_type,
-        "save_path": f.data_config["paths"]["models"][model_type],
-    }
     
-    if model_type == "lstm":
-        config["type"] = "simple" if "simple" in model_name else "multivariate"
-        config["look_back"] = 30
+    model_config["save_path"] = f.data_config["paths"]["models"][model_type]
 
-    f.load_model(model_name, config)
+    f.load_model(model_name, model_config)
     y_val =  f.get_y_val()
     pred = f.predict()
     
-    if model_type == "lstm" and config["type"] == "multivariate":
-        pred = pred[:, -1]
+    #if model_type == "lstm" and model_config["type"] == "multivariate":
+    #    pred = pred[:, -1]
 
     mse = round(mean_squared_error(y_val, pred), 2)
 
@@ -364,7 +367,7 @@ def evaluate_model(f: Factory, model_type: str, model_name: str) -> float:
 
 
 def validation_pipeline(
-    models_to_validate: Dict[str, Any], data_config: Dict[str, Any]
+    models_to_validate: Dict[str, Any], config: Dict[str, Any]
 ):
     """
     Runs the validation pipeline for the given models and configuration.
@@ -376,7 +379,9 @@ def validation_pipeline(
     Returns:
         None
     """
-    filename = f'Validation - {str(datetime.now(timezone.utc)).split(".")[0]}'
+    data_config = config["data"]
+    
+    filename = f'Validation - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
     print(f"Writing validation results in `{filename}` ... \n")
 
     df = load_data(data_config["paths"])
@@ -389,8 +394,13 @@ def validation_pipeline(
         "w+",
     ) as file:
         for model_type, models in models_to_validate.items():
+            if models is None:
+                continue
             for model_name in models:
-                mse = evaluate_model(f, model_type, model_name)
+                model_config = get_config_from_model_name(
+                    model_name, model_type, config
+                )
+                mse = evaluate_model(f, model_type, model_name, model_config)
                 file.write(f"Type: {model_type} - Name: {model_name} - MSE: {mse} \n")
 
                 if mse < min_mse:
@@ -414,6 +424,8 @@ def launch_pipeline(
     """Launches the pipeline."""
     print("Launching pipeline ...")
 
+    config = convert_config_to_dict(config)
+
     if generate:
         generate_datasets(config["data"], save=save)
 
@@ -427,4 +439,4 @@ def launch_pipeline(
         )
 
     if validate:
-        validation_pipeline(config["pipeline"]["validation"]["models"], config["data"])
+        validation_pipeline(config["pipeline"]["validation"]["models"], config)

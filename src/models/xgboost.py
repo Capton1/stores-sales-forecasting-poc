@@ -58,7 +58,7 @@ def build_xgboost(
                     "rb",
                 )
             )
-        return mlflow.xgboost.load_model(load_model_name)
+        return mlflow.pyfunc.load_model(f"models:/{load_model_name}/latest")
 
     return _build_xgboost(**model_config["build_params"])
 

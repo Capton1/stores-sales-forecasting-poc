@@ -135,7 +135,7 @@ def build_lstm(
                     "rb",
                 )
             )
-        return mlflow.keras.load_model(load_model_name)
+        return mlflow.pyfunc.load_model(f"models:/{load_model_name}/latest")
 
         
     reg = build_regularization(model_config)

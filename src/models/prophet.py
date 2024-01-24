@@ -38,7 +38,7 @@ def build_prophet(model_config: Dict[str, Any], load_model_name: str = None, use
                     "rb",
                 )
             )
-        return mlflow.prophet.load_model(load_model_name)
+        return mlflow.prophet.load_model(f"models:/{load_model_name}/latest")
 
     return _build_prophet(model_config["build_params"])
 

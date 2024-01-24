@@ -36,7 +36,7 @@ multivariate_batch_size_32_look_back_15:
 
 simple_batch_size_128_look_back_5:
   fit_params:
-    batch_size: 32
+    batch_size: 128
     epochs: 30
   build_params:
     optimizer: adam
