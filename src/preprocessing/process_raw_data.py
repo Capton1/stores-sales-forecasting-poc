@@ -289,14 +289,14 @@ def get_preprocessing_pipeline(
 def process_data(
     df: pd.DataFrame,
     data_config: Dict[str, Any],
-    save=False,
 ) -> pd.DataFrame:
     """Process the data."""
     df = interpolate_data(df, "dcoilwtico")
     df = fix_transfered_holidays(df)
 
     features_to_select = data_config["features"]
-    features_to_select.append(data_config["target"])
+    if data_config["target"] not in features_to_select:
+        features_to_select.append(data_config["target"])
     df = select_features(df, features_to_select)
 
     df = group_by_date(df, mean=["dcoilwtico", "cluster"], sum=["onpromotion", "sales"])

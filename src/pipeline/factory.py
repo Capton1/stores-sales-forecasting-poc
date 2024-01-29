@@ -20,7 +20,7 @@ from models.xgboost import build_xgboost, xgboost_cross_validation_train
 from pipeline.helpers import convert_config_to_dict, get_config_from_model_name
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import load_data, process_data
-
+from sklearn.preprocessing import MinMaxScaler
 
 class Factory:
     def __init__(self, data_config: Dict[str, Any]):
@@ -34,6 +34,8 @@ class Factory:
 
         self.model = None
         self.input_data_shape = None
+        
+        self.y_scaler = None
 
     def get_attributes(self):
         return self.__dict__
@@ -86,11 +88,11 @@ class Factory:
                 else None
             )
         if self.model_config["_name"] == "lstm":
-            self.train_generator, self.input_data_shape = build_lstm_generator(
-                self.train_df, self.model_config, self.data_config["target"]
+            self.train_generator, self.input_data_shape, self.y_scaler = build_lstm_generator(
+                self.train_df, self.model_config, self.data_config["target"], MinMaxScaler(feature_range=(0,1))
             )
         elif self.model_config["_name"] == "xgboost":
-            self.train_generator = generate_ml_features(
+            self.train_generator, self.y_scaler = generate_ml_features(
                 self.train_df, self.data_config["target"]
             )
         elif self.model_config["_name"] == "prophet":
@@ -112,7 +114,7 @@ class Factory:
 
         if self.model_config["_name"] == "lstm":
             self.model = build_lstm(
-                self.input_data_shape, self.model_config, load_model_name, use_mlflow
+                self.input_data_shape, self.model_config, load_model_name, use_mlflow,
             )
         elif self.model_config["_name"] == "xgboost":
             self.model = build_xgboost(self.model_config, load_model_name, use_mlflow)
@@ -196,9 +198,11 @@ class Factory:
         self.fit(df)
         return self.train_df
 
-    def predict(self, data: pd.DataFrame = None):
+    def predict(self, data: pd.DataFrame = None, scaled = False):
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
+
+        scaler = MinMaxScaler(feature_range=(0,1)) if scaled else None
 
         if self.model_config["_name"] == "lstm":
             if data is not None:
@@ -208,27 +212,26 @@ class Factory:
                 val_lstm = pd.concat(
                     [self.train_df[-self.model_config["look_back"] :], self.val_df]
                 )
-                data, shape = build_lstm_generator(
-                    val_lstm, self.model_config, self.data_config["target"]
+                data, shape, self.y_scaler = build_lstm_generator(
+                    val_lstm, self.model_config, self.data_config["target"], scaler
                 )
                 self.input_data_shape = shape
 
             res = []
             for x in data:
-                if self.model_config["type"] == "multivariate":
-                    res.append(self.model.predict((x[0][0], x[0][1]))[0][0])
-                else:
-                    res.append(self.model.predict(x[0])[0][0])
-            return res
+                elt = [x[0][0], x[0][1]] if self.model_config["type"] == "multivariate" else x[0]         
+                res.append(self.model.predict(elt)[0][0])
+
+            return scaler.inverse_transform(np.reshape(res, (-1,1))) if scaled else res
         elif self.model_config["_name"] == "xgboost":
             data = (
-                generate_ml_features(self.val_df, self.data_config["target"])[0]
+                generate_ml_features(self.val_df, self.data_config["target"], scaler)[0]
                 if data is None
                 else data
-            )
-            return self.model.predict(data)
+            )[0]
+
+            return self.y_scaler.inverse_transform(self.model.predict(data).reshape(-1,1)) if scaled else self.model.predict(data)
         elif self.model_config["_name"] == "prophet":
-            print(type(self.model))
             future = self.model.make_future_dataframe(
                 periods=len(self.val_df), freq="D", include_history=False
             )
@@ -434,6 +437,7 @@ def launch_pipeline(
     save: bool = False,
     load_model_name: str = None,
     limit: int = 1520,
+    experiment_id: int = 0,
 ):
     """Launches the pipeline."""
     print("Launching pipeline ...")
@@ -444,6 +448,9 @@ def launch_pipeline(
         generate_datasets(config["data"], save=save)
 
     if train:
+        if save:
+            mlflow.start_run(experiment_id=experiment_id)
+        
         generate_models(
             config["data"],
             config[model][model_config_name],

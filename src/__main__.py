@@ -22,8 +22,6 @@ def main(config_files: Namespace):
     mlflow.set_tracking_uri("http://0.0.0.0:5000")
     e = mlflow.set_experiment(config["data"]["mlflow_experiment_name"])
 
-    mlflow.start_run(experiment_id=e.experiment_id)
-
     launch_pipeline(
         config,
         config_files.model,
@@ -34,6 +32,7 @@ def main(config_files: Namespace):
         load_model_name=config_files.load,
         validate=config_files.eval,
         limit=config_files.limit,
+        experiment_id=e.experiment_id,
     )
 
     mlflow.end_run()

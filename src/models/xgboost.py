@@ -108,13 +108,13 @@ def xgboost_cross_validation_train(
     }
 
     df = pd.merge(generator[0], generator[1], left_index=True, right_index=True)
-    n_splits = int((1 // 0.1) - 1)  # 10% test size
+    n_splits = int((1 // 0.1) - 1)  # 10% test size at each split
     time_series_split = TimeSeriesSplit(n_splits=n_splits, gap=24)
 
     for i_train, i_val in time_series_split.split(df):
         train = df.iloc[i_train]
         val = df.iloc[i_val]
-
+        
         train_in = train.drop(columns=["sales"])
         train_out = train["sales"]
         val_in = val.drop(columns=["sales"])
