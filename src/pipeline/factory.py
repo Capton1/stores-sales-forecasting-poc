@@ -97,6 +97,7 @@ class Factory:
             else None
         )
 
+
         if self.model_config["_name"] == "lstm":
             (
                 self.train_generator,
@@ -221,13 +222,13 @@ class Factory:
 
         scaler = (
             MinMaxScaler(feature_range=(0, 1))
-            if "scaler" in self.model_config and self.model_config["scaler"]
+            if "scaled" in self.model_config and self.model_config["scaled"]
             else None
         )
 
         if self.model_config["_name"] == "lstm":
             if data is not None:
-                self.input_data_shape = data.shape
+                self.input_data_shape, self.y_scaler = data.shape, scaler
             else:
                 # concatenate the last `look_back` days of the training set to the validation set in order to predict the first day of the validation set
                 val_lstm = pd.concat(
@@ -247,14 +248,14 @@ class Factory:
                 )
                 res.append(self.model.predict(elt)[0][0])
 
-            return scaler.inverse_transform(np.reshape(res, (-1, 1))) if scaler else res
+            return self.y_scaler.inverse_transform(np.reshape(res, (-1, 1))) if scaler else res
         elif self.model_config["_name"] == "xgboost":
-            data = (
-                generate_ml_features(self.val_df, self.data_config["target"], scaler)[0]
-                if data is None
-                else data
-            )[0]
-
+            if data is not None:
+                self.y_scaler = scaler
+            else:
+                Xy, self.y_scaler = generate_ml_features(self.val_df, self.data_config["target"], scaler)
+                data = Xy[0]
+                
             return (
                 self.y_scaler.inverse_transform(self.model.predict(data).reshape(-1, 1))
                 if scaler
@@ -421,7 +422,7 @@ def evaluate_model(
 
     f.load_model(model_name, model_config)
     y_val = f.get_y_val()
-    pred = f.predict(scaled=model_config["scaled"])
+    pred = f.predict()
 
     mse = round(mean_squared_error(y_val, pred), 2)
 
