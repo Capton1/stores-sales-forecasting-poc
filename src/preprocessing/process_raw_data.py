@@ -295,15 +295,19 @@ def drop_duplicates(df: pd.DataFrame, subset: List[str] = []) -> pd.DataFrame:
     Returns:
         pd.DataFrame: df with duplicates dropped
     """
-    return df.drop_duplicates(subset=subset, keep=False,)
+    return df.drop_duplicates(
+        subset=subset,
+        keep=False,
+    )
+
 
 def process_data(
     df: pd.DataFrame,
     data_config: Dict[str, Any],
 ) -> pd.DataFrame:
     """Process the data."""
-    df = drop_duplicates(df, ['sales', 'date', "store_nbr", "family"])
-    
+    df = drop_duplicates(df, ["sales", "date", "store_nbr", "family"])
+
     df = interpolate_data(df, "dcoilwtico")
     df = fix_transfered_holidays(df)
 

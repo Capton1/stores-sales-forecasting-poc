@@ -3,7 +3,6 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 from keras.preprocessing.sequence import TimeseriesGenerator, pad_sequences
-
 from sklearn.preprocessing import MinMaxScaler
 
 
@@ -94,7 +93,7 @@ def generate_ml_features(
 
     X = create_date_features(X)
     X["sales_mov_avg"] = get_simple_mov_avg(df, window=7, column=target)
-        
+
     return (X, y), y_scaler
 
 
@@ -266,19 +265,27 @@ def build_lstm_generator(
         y = pd.DataFrame(y_scaler.fit_transform(y), columns=[target], index=y.index)
 
     if model_config["type"] == "simple":
-        return get_single_input_timeseries_generator(
-            X, y, model_config["look_back"], batch_size=1
-        ), (model_config["look_back"], X.shape[1]), y_scaler
+        return (
+            get_single_input_timeseries_generator(
+                X, y, model_config["look_back"], batch_size=1
+            ),
+            (model_config["look_back"], X.shape[1]),
+            y_scaler,
+        )
     elif model_config["type"] == "multivariate":
         X_continuous = X.select_dtypes(include=["number"])
         X_categorical = X.select_dtypes(include=["bool"])
 
-        return get_multiple_input_timeseries_generator(
-            X_continuous, X_categorical, y, model_config["look_back"], batch_size=1
-        ), (
-            (model_config["look_back"], X_continuous.shape[1]),
-            (model_config["look_back"], X_categorical.shape[1]),
-        ), y_scaler
+        return (
+            get_multiple_input_timeseries_generator(
+                X_continuous, X_categorical, y, model_config["look_back"], batch_size=1
+            ),
+            (
+                (model_config["look_back"], X_continuous.shape[1]),
+                (model_config["look_back"], X_categorical.shape[1]),
+            ),
+            y_scaler,
+        )
     else:
         raise ValueError("Unknown model type")
 
@@ -286,5 +293,5 @@ def build_lstm_generator(
 if __name__ == "__main__":
     x = pd.DataFrame({"sales": [1, 2, 3, 4, 5, 6, 7, 8, 9]})
     a = get_simple_mov_avg(x)
-    x['avg'] = a
+    x["avg"] = a
     print(x)

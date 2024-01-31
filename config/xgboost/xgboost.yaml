@@ -9,3 +9,17 @@ default:
     eval_metric: rmse
     early_stopping_rounds: 100
   _name: xgboost
+
+default_scaled:
+  fit_params:
+    verbose: True
+  build_params:
+    loss: squarederror
+    learning_rate: 0.01
+    max_depth: 6
+    n_estimators: 10000
+    eval_metric: rmse
+    early_stopping_rounds: 100
+  _name: xgboost
+  scaler: True
+

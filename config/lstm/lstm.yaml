@@ -25,7 +25,7 @@ default_multivariate:
 multivariate_batch_size_32_look_back_15:
   fit_params:
     batch_size: 32
-    epochs: 30
+    epochs: 20
   build_params:
     optimizer: adam
     loss: mse
@@ -37,7 +37,7 @@ multivariate_batch_size_32_look_back_15:
 simple_batch_size_128_look_back_5:
   fit_params:
     batch_size: 128
-    epochs: 30
+    epochs: 20
   build_params:
     optimizer: adam
     loss: mse
@@ -49,7 +49,7 @@ simple_batch_size_128_look_back_5:
 simple_default_l1_0_01_l2_0_01:
   fit_params:
     batch_size: 32
-    epochs: 30
+    epochs: 20
   build_params:
     optimizer: adam
     loss: mse
@@ -59,3 +59,29 @@ simple_default_l1_0_01_l2_0_01:
   look_back: 30
   type: simple # multivariate or simple
   _name: lstm
+
+default_simple_scaled:
+  fit_params:
+    batch_size: 64
+    epochs: 20
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.1
+  look_back: 30
+  type: simple # multivariate or simple
+  _name: lstm
+  scaled: True
+
+default_multivariate_scaled:
+  fit_params:
+    batch_size: 64
+    epochs: 20
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.1
+  look_back: 30
+  type: multivariate # multivariate or simple
+  _name: lstm
+  scaled: True
