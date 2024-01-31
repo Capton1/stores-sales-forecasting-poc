@@ -3,7 +3,6 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 from keras.preprocessing.sequence import TimeseriesGenerator, pad_sequences
-from sklearn.preprocessing import MinMaxScaler
 
 
 def get_features_and_target(
@@ -74,7 +73,8 @@ def get_simple_mov_avg(
 
 
 def generate_ml_features(
-    df: pd.DataFrame, target: str = "sales", y_scaler=None
+    df: pd.DataFrame,
+    target: str = "sales",
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generate machine learning features from the given DataFrame.
@@ -88,13 +88,10 @@ def generate_ml_features(
     """
     X, y = get_features_and_target(df, target=target)
 
-    if y_scaler is not None:
-        y = pd.DataFrame(y_scaler.fit_transform(y), columns=[target], index=y.index)
-
     X = create_date_features(X)
     X["sales_mov_avg"] = get_simple_mov_avg(df, window=7, column=target)
 
-    return (X, y), y_scaler
+    return (X, y)
 
 
 def get_single_input_timeseries_generator(
@@ -244,7 +241,9 @@ def get_prophet_df(df: pd.DataFrame, df2: pd.DataFrame = None) -> pd.DataFrame:
 
 
 def build_lstm_generator(
-    df: pd.DataFrame, model_config: Dict[str, Any], target: str = "sales", y_scaler=None
+    df: pd.DataFrame,
+    model_config: Dict[str, Any],
+    target: str = "sales",
 ) -> Tuple[TimeseriesGenerator, Tuple[int]]:
     """
     Build a time series generator based on the given input data and model configuration.
@@ -261,16 +260,12 @@ def build_lstm_generator(
     """
     X, y = get_features_and_target(df, target=target)
 
-    if y_scaler is not None:
-        y = pd.DataFrame(y_scaler.fit_transform(y), columns=[target], index=y.index)
-
     if model_config["type"] == "simple":
         return (
             get_single_input_timeseries_generator(
                 X, y, model_config["look_back"], batch_size=1
             ),
             (model_config["look_back"], X.shape[1]),
-            y_scaler,
         )
     elif model_config["type"] == "multivariate":
         X_continuous = X.select_dtypes(include=["number"])
@@ -284,7 +279,6 @@ def build_lstm_generator(
                 (model_config["look_back"], X_continuous.shape[1]),
                 (model_config["look_back"], X_categorical.shape[1]),
             ),
-            y_scaler,
         )
     else:
         raise ValueError("Unknown model type")

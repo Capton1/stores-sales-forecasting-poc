@@ -1,6 +1,9 @@
+import pickle
 from typing import Any, Dict
 
+import mlflow
 from omegaconf.dictconfig import DictConfig
+from sklearn.preprocessing import MinMaxScaler
 
 
 def get_config_from_model_name(
@@ -41,3 +44,31 @@ def convert_config_to_dict(config):
                     config[e][i] = dict(config[e][i])
 
     return config
+
+
+def load_scaler_from_model(model_name: str) -> MinMaxScaler:
+    """
+    Load the scaler from the model.
+
+    Args:
+        model_name (str): The name of the model.
+
+    Returns:
+        MinMaxScaler: The loaded scaler.
+    """
+    local_path = mlflow.artifacts.download_artifacts(
+        artifact_uri=f"runs:/{model_name}/scaler.h5",
+        dst_path=f"models_save/scaler/{model_name}.h5",
+    )
+    scaler = pickle.load(
+        open(
+            local_path,
+            "rb",
+        )
+    )
+    return scaler
+
+
+if __name__ == "__main__":
+    mlflow.set_tracking_uri("http://localhost:5000")
+    print(type(load_scaler_from_model("35684897dee349d39b0f37103f7738cc")))

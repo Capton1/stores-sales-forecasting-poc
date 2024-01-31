@@ -63,7 +63,7 @@ class Factory:
     def get_y_val(self):
         return self.val_df[self.data_config["target"]]
 
-    def _fit_data(self, X: pd.DataFrame):
+    def _fit_data(self, X: pd.DataFrame, scaler: MinMaxScaler = None):
         if self.train_df is not None:
             return self
 
@@ -71,6 +71,14 @@ class Factory:
 
         try:
             self.df = process_data(X, data_config=self.data_config)
+
+            # scale data if needed before splitting it
+            if scaler:
+                self.df[[self.data_config["target"]]] = scaler.fit_transform(
+                    self.df[[self.data_config["target"]]]
+                )
+                self.y_scaler = scaler
+
             self.train_df, self.val_df = train_val_split(
                 self.df, val_ratio=self.data_config["validation_ratio"]
             )
@@ -79,10 +87,7 @@ class Factory:
 
         return self
 
-    def _build_generator(self, model_config: Dict[str, Any] = None):
-        if self.train_df is None:
-            raise ValueError("Data not found. Please fit the data first")
-
+    def _build_generator(self, df: pd.DataFrame, model_config: Dict[str, Any] = None):
         if self.model_config is None:
             self.model_config = dict(model_config)
             self.fit_params = (
@@ -97,18 +102,21 @@ class Factory:
             else None
         )
 
+        self._fit_data(df, scaler)
 
         if self.model_config["_name"] == "lstm":
             (
                 self.train_generator,
                 self.input_data_shape,
-                self.y_scaler,
             ) = build_lstm_generator(
-                self.train_df, self.model_config, self.data_config["target"], scaler
+                self.train_df,
+                self.model_config,
+                self.data_config["target"],
             )
         elif self.model_config["_name"] == "xgboost":
-            self.train_generator, self.y_scaler = generate_ml_features(
-                self.train_df, self.data_config["target"], scaler
+            self.train_generator = generate_ml_features(
+                self.train_df,
+                self.data_config["target"],
             )
         elif self.model_config["_name"] == "prophet":
             self.train_generator = get_prophet_df(self.train_df, self.val_df)
@@ -145,16 +153,14 @@ class Factory:
 
     def _fit_model(
         self,
+        df: pd.DataFrame,
         model_config: Dict[str, Any],
         model_config_name: str = "default",
         load_model_name: str = None,
     ):
-        if self.train_df is None:
-            raise ValueError("Data not found. Please fit the data first")
-
         self.model_config_name = model_config_name
 
-        self._build_generator(model_config)
+        self._build_generator(df, model_config)
         self._build_model(load_model_name)
 
         if self.model_config["_name"] == "lstm":
@@ -192,23 +198,7 @@ class Factory:
         if not model_config and not load_model_name:
             return self._fit_data(df)
 
-        self._fit_data(df)
-        self._fit_model(model_config, model_config_name, load_model_name)
-
-        return self
-
-    def fit_model(
-        self,
-        model_config: Dict[str, Any],
-        model_config_name: str = "default",
-        load_model_name: str = None,
-    ):
-        if self.train_df is None:
-            raise ValueError("Data not found. Please fit the data first")
-
-        self._fit_model(
-            model_config[model_config_name], model_config_name, load_model_name
-        )
+        self._fit_model(df, model_config, model_config_name, load_model_name)
 
         return self
 
@@ -234,8 +224,8 @@ class Factory:
                 val_lstm = pd.concat(
                     [self.train_df[-self.model_config["look_back"] :], self.val_df]
                 )
-                data, shape, self.y_scaler = build_lstm_generator(
-                    val_lstm, self.model_config, self.data_config["target"], scaler
+                data, shape = build_lstm_generator(
+                    val_lstm, self.model_config, self.data_config["target"]
                 )
                 self.input_data_shape = shape
 
@@ -248,14 +238,17 @@ class Factory:
                 )
                 res.append(self.model.predict(elt)[0][0])
 
-            return self.y_scaler.inverse_transform(np.reshape(res, (-1, 1))) if scaler else res
+            return (
+                self.y_scaler.inverse_transform(np.reshape(res, (-1, 1)))
+                if scaler
+                else res
+            )
         elif self.model_config["_name"] == "xgboost":
             if data is not None:
                 self.y_scaler = scaler
             else:
-                Xy, self.y_scaler = generate_ml_features(self.val_df, self.data_config["target"], scaler)
-                data = Xy[0]
-                
+                data = generate_ml_features(self.val_df, self.data_config["target"])[0]
+
             return (
                 self.y_scaler.inverse_transform(self.model.predict(data).reshape(-1, 1))
                 if scaler
@@ -315,6 +308,17 @@ class Factory:
         mlflow.log_param("model_type", self.model_config["_name"])
         mlflow.log_param("model_config", self.model_config)
         mlflow.log_metric("MSE", self.val_mse)
+
+        if self.y_scaler:
+            scaler_log_path = f"{pathlib.Path(self.data_config['paths']['scaler']).absolute()}/scaler.h5"
+            pickle.dump(
+                self.y_scaler,
+                open(
+                    scaler_log_path,
+                    "wb",
+                ),
+            )
+            mlflow.log_artifact(scaler_log_path)
 
         if not use_mlflow:
             pickle.dump(

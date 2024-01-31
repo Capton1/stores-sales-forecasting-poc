@@ -4,7 +4,8 @@ import pandas as pd
 
 
 def train_val_split(
-    df: pd.DataFrame, val_ratio=0.9
+    df: pd.DataFrame,
+    val_ratio=0.9,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """split df in train and validation set. Split at specified ratio cause it's a time series.
 
