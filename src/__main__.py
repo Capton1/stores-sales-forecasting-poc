@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--model",
-        choices=["lstm", "xgboost", "prophet"],
+        choices=["lstm", "xgboost", "prophet", "all"],
         help="model to use",
     )
     parser.add_argument("-c", "--model_config", default="default", help="model config")

@@ -36,6 +36,7 @@ class Factory:
         self.input_data_shape = None
         
         self.y_scaler = None
+        self.save_name = None
 
     def get_attributes(self):
         return self.__dict__
@@ -49,6 +50,10 @@ class Factory:
 
     def set_model_type(self, model_type: str):
         self.model_config["_name"] = model_type
+        return self
+    
+    def set_save_name(self, save_name: str):
+        self.save_name = save_name
         return self
 
     def get_model_config(self):
@@ -89,7 +94,7 @@ class Factory:
             )
         if self.model_config["_name"] == "lstm":
             self.train_generator, self.input_data_shape, self.y_scaler = build_lstm_generator(
-                self.train_df, self.model_config, self.data_config["target"], MinMaxScaler(feature_range=(0,1))
+                self.train_df, self.model_config, self.data_config["target"], None
             )
         elif self.model_config["_name"] == "xgboost":
             self.train_generator, self.y_scaler = generate_ml_features(
@@ -257,22 +262,26 @@ class Factory:
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
 
-        model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+        if not self.save_name:
+            model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+        else:
+            model_name = self.save_name
 
         if self.model_config["_name"] == "lstm":
             mlflow.tensorflow.log_model(
-                self.model, artifact_path="model", registered_model_name=model_name
+                self.model, artifact_path="model", registered_model_name=model_name,
             )
         elif self.model_config["_name"] == "xgboost":
             mlflow.sklearn.log_model(
-                self.model, artifact_path="model", registered_model_name=model_name
+                self.model, artifact_path="model", registered_model_name=model_name,
             )
         else:
             mlflow.prophet.log_model(
-                self.model, artifact_path="model", registered_model_name=model_name
+                self.model, artifact_path="model", registered_model_name=model_name,
             )
 
         mlflow.set_tags({"model_type": self.model_config["_name"]})
+        mlflow.log_param("model_type", self.model_config["_name"])
         mlflow.log_param("model_config", self.model_config)
         mlflow.log_metric("MSE", self.val_mse)
 
@@ -333,6 +342,7 @@ def generate_models(
     model_config_name: str,
     save: bool = False,
     load_model_name: str = None,
+    save_name: str = None,
 ) -> Factory:
     """Generates models.
 
@@ -342,6 +352,10 @@ def generate_models(
     """
     df = load_data(data_config["paths"])
     f = Factory(data_config)
+    
+    if save_name:
+        f.set_save_name(save_name)
+    
     f.fit(
         df,
         model_config=model_config,
@@ -376,9 +390,6 @@ def evaluate_model(
     f.load_model(model_name, model_config)
     y_val = f.get_y_val()
     pred = f.predict()
-
-    # if model_type == "lstm" and model_config["type"] == "multivariate":
-    #    pred = pred[:, -1]
 
     mse = round(mean_squared_error(y_val, pred), 2)
 
@@ -451,13 +462,28 @@ def launch_pipeline(
         if save:
             mlflow.start_run(experiment_id=experiment_id)
         
-        generate_models(
-            config["data"],
-            config[model][model_config_name],
-            model_config_name=model_config_name,
-            save=save,
-            load_model_name=load_model_name,
-        )
+        if model == "all":
+            print("Training all models ...")
+            for i in ["lstm", "xgboost", "prophet"]:
+                for j in config[i]:
+                    print(f"Training {i} {j} ...")
+                    save_name = f'{i} {j} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+                    with mlflow.start_run(nested=True, run_name=save_name):
+                        generate_models(
+                            config["data"],
+                            config[i][j],
+                            model_config_name=j,
+                            save=save,
+                            save_name=save_name,
+                        )
+        else:
+            generate_models(
+                config["data"],
+                config[model][model_config_name],
+                model_config_name=model_config_name,
+                save=save,
+                load_model_name=load_model_name,
+            )
 
     if validate:
         validation_pipeline(config["pipeline"]["validation"]["models"], config)

@@ -1147,6 +1147,16 @@ test = ["pickleshare", "pytest", "pytest-asyncio (<0.22)", "testpath"]
 test-extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.23)", "pandas", "pickleshare", "pytest", "pytest-asyncio (<0.22)", "testpath", "trio"]
 
 [[package]]
+name = "ipython-extensions"
+version = "0.2"
+description = "Optional extensions for IPython"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ipython-extensions-0.2.tar.gz", hash = "sha256:b16510bfe091bd483d9637dcd0d83946d21f7c922309214a60e89377b00bc838"},
+]
+
+[[package]]
 name = "itsdangerous"
 version = "2.1.2"
 description = "Safely pass data to untrusted environments and back."
@@ -3630,4 +3640,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.11"
-content-hash = "4a42b310d93b3a7d61875e94a398274a130fb1ccf2d4bafe515bf27483210d00"
+content-hash = "f286a78350f3032fbb34dbae715f8852258b471cf1f58f57f48738c9a7c852c5"

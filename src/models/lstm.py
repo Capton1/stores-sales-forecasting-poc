@@ -143,7 +143,7 @@ def build_lstm(
                     "rb",
                 )
             )
-        return mlflow.pyfunc.load_model(f"models:/{load_model_name}/latest")
+        return mlflow.pyfunc.load_model(f"runs:/{load_model_name}/model")
 
     reg = build_regularization(model_config)
 

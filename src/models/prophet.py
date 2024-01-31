@@ -40,7 +40,7 @@ def build_prophet(
                     "rb",
                 )
             )
-        return mlflow.prophet.load_model(f"models:/{load_model_name}/latest")
+        return mlflow.prophet.load_model(model_uri=f"runs:/{load_model_name}/model")
 
     return _build_prophet(model_config["build_params"])
 
