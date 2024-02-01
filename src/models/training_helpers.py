@@ -3,6 +3,7 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 from keras.preprocessing.sequence import TimeseriesGenerator, pad_sequences
+from xgboost import XGBRegressor
 
 
 def get_features_and_target(
@@ -282,6 +283,11 @@ def build_lstm_generator(
         )
     else:
         raise ValueError("Unknown model type")
+
+
+def get_basic_model(model_type: str) -> Any:
+    if model_type == "xgboost":
+        return XGBRegressor(random_state=42)
 
 
 if __name__ == "__main__":

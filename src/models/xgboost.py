@@ -4,8 +4,9 @@ from typing import Any, Dict, Tuple
 
 import mlflow
 import pandas as pd
+from hyperopt import STATUS_OK
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from xgboost import XGBRegressor
 
 
@@ -140,3 +141,36 @@ def xgboost_cross_validation_train(
     avg_mse = mean_squared_error(logs["target_log"], logs["pred_log"])
 
     return avg_mse
+
+
+def xgboost_objective_function(
+    params: Dict[str, Any],
+    generator: Tuple[pd.DataFrame, pd.DataFrame],
+) -> Dict[str, Any]:
+    """
+    Objective function for XGBoost model optimization.
+
+    Args:
+        generator (Tuple[pd.DataFrame, pd.DataFrame]): A tuple containing the training data and target values.
+        params (Dict[str, Any]): A dictionary of XGBoost model hyperparameters.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the loss value, optimized parameters, and status.
+    """
+    xgboost = XGBRegressor(random_state=42, objective="reg:squarederror", **params)
+
+    n_splits = int((1 // 0.1) - 1)  # 10% test size at each split
+    time_series_split = TimeSeriesSplit(n_splits=n_splits, gap=24)
+
+    score = cross_val_score(
+        estimator=xgboost,
+        X=generator[0],
+        y=generator[1],
+        cv=time_series_split,
+        scoring="neg_root_mean_squared_error",
+        n_jobs=-1,
+    ).mean()
+    # Loss is negative score
+    loss = -score
+    # Dictionary with information for evaluation
+    return {"loss": loss, "params": params, "status": STATUS_OK}

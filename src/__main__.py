@@ -6,7 +6,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import sys  # noqa
 from argparse import ArgumentParser, Namespace
 
-from pipeline.factory import launch_pipeline
+from pipeline.launcher import launch_pipeline
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))  # noqa
 
@@ -33,6 +33,7 @@ def main(config_files: Namespace):
         validate=config_files.eval,
         limit=config_files.limit,
         experiment_id=e.experiment_id,
+        perform_optimization=config_files.optimize,
     )
 
     mlflow.end_run()
@@ -68,18 +69,21 @@ if __name__ == "__main__":
     group.add_argument(
         "-e", "--eval", help="launch evaluation pipeline", action="store_true"
     )
+    group.add_argument(
+        "-o", "--optimize", help="launch optimization pipeline", action="store_true"
+    )
 
     parser.add_argument("-s", "--save", help="save data or model", action="store_true")
     parser.add_argument("-l", "--load", default=None, help="path to model to load")
 
     args = parser.parse_args()
 
-    if args.train and not args.model:
+    if (args.train or args.optimize) and not args.model:
         raise ValueError("The --train option requires specifying a --model.")
 
-    if sum([args.train, args.generate, args.eval]) > 1:
+    if sum([args.train, args.generate, args.eval, args.optimize]) > 1:
         raise ValueError(
-            "Cannot use both -t/--train, -g/--generate, and -e/--eval options at the same time."
+            "Cannot use both -t/--train, -g/--generate, -e/--eval, and -o/--optimize options at the same time."
         )
 
     main(args)

@@ -1,13 +1,20 @@
 validation:
   models:
     xgboost:
-      - xgboost default - 2024-01-24 10:23:02
+      - xgboost default_scaled - 2024-01-31 15:51
+      - xgboost default - 2024-01-31 10:23
+      - xgboost default_max_depth_12 - 2024-02-01 10:26
     lstm:
-      - lstm simple_default_l1_0_01_l2_0_01 - 2024-01-24 08:36:26
-      - lstm simple_batch_size_128_look_back_5 - 2024-01-23 16:01:14
-      - lstm default_simple - 2024-01-23 14:11:32
-      - lstm default_multivariate - 2024-01-23 13:52:03
-
+      - lstm simple_batch_size_128_look_back_5 - 2024-01-31 10:10
+      - lstm simple_default_l1_0_01_l2_0_01 - 2024-01-31 10:14
+      - lstm default_simple - 2024-01-31 09:48
+      - lstm simple_batch_size_32_look_back_15_lr_0.1_scaled - 2024-02-01 09:51
+      - lstm default_simple_scaled - 2024-02-01 09:15
+      - lstm simple_batch_size_16_look_back_5_lr_0.01_scaled - 2024-02-01 09:22
+      - lstm simple_batch_size_16_look_back_10_lr_0.1_scaled - 2024-02-01 09:30
+      - lstm default_multivariate - 2024-01-31 09:56
+      - lstm multivariate_batch_size_32_look_back_15 - 2024-01-31 10:04
+      - lstm default_multivariate_scaled - 2024-02-01 10:51
     prophet:
-      - prophet default - 2024-01-23 13:34:58
-      - prophet changepoint_prior_scale_0_5 - 2024-01-23 13:34:26
+      - prophet default - 2024-01-31 10:24
+      - prophet changepoint_prior_scale_0_5 - 2024-01-31 10:24

@@ -23,3 +23,14 @@ default_scaled:
   _name: xgboost
   scaled: True
 
+default_max_depth_12:
+  fit_params:
+    verbose: True
+  build_params:
+    loss: squarederror
+    learning_rate: 0.01
+    max_depth: 12
+    n_estimators: 10000
+    eval_metric: rmse
+    early_stopping_rounds: 100
+  _name: xgboost

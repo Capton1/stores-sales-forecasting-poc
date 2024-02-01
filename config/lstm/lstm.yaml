@@ -85,3 +85,42 @@ default_multivariate_scaled:
   type: multivariate # multivariate or simple
   _name: lstm
   scaled: True
+
+simple_batch_size_16_look_back_5_lr_0.01_scaled:
+  fit_params:
+    batch_size: 16
+    epochs: 20
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.01
+  look_back: 5
+  type: simple # multivariate or simple
+  _name: lstm
+  scaled: True
+
+simple_batch_size_16_look_back_10_lr_0.1_scaled:
+  fit_params:
+    batch_size: 16
+    epochs: 50
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.01
+  look_back: 10
+  type: simple # multivariate or simple
+  _name: lstm
+  scaled: True
+
+simple_batch_size_32_look_back_15_lr_0.1_scaled:
+  fit_params:
+    batch_size: 32
+    epochs: 150
+  build_params:
+    optimizer: adam
+    loss: mse
+    learning_rate: 0.01
+  look_back: 15
+  type: simple # multivariate or simple
+  _name: lstm
+  scaled: True
