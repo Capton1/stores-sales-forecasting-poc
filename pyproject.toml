@@ -31,6 +31,7 @@ scikeras = "^0.12.0"
 mlflow = "^2.9.2"
 ipython-extensions = "^0.2"
 hyperopt = "^0.2.7"
+jupyter = "^1.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

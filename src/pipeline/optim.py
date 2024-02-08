@@ -37,7 +37,7 @@ def get_space_of_hyperparameters(model_type: str) -> Dict[str, Any]:
             ),
             "reg_alpha": hp.choice("reg_alpha", [1e-5, 1e-2, 0.1, 1, 10, 100]),
             "reg_lambda": hp.choice("reg_lambda", [1e-5, 1e-2, 0.1, 1, 10, 100]),
-            "n_estimators": hp.choice("n_estimators", range(0, 10000, 1000)),
+            "n_estimators": hp.choice("n_estimators", range(0, 5000, 1000)),
         }
     else:
         raise ValueError("Unknown model type")

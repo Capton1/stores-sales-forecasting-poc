@@ -72,10 +72,31 @@ def get_simple_mov_avg(
     x = df[column].rolling(window=window, min_periods=1).mean()
     return x
 
+def get_earthquake_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create additional earthquake-related features in the given DataFrame.
+    Impact of the earthquake has been observed on the sales until 3 days after the event.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the date index.
+
+    Returns:
+        pd.DataFrame: The DataFrame with additional earthquake features.
+    """
+    df["earthquake"] = 0
+    if "2016-04-16" in df.index and "2016-04-17" in df.index and "2016-04-18" in df.index and "2016-04-19" in df.index:
+        df.loc["2016-04-16", "earthquake"] = 1
+        df.loc["2016-04-17", "earthquake"] = 1
+        df.loc["2016-04-18", "earthquake"] = 1
+        df.loc["2016-04-19", "earthquake"] = 1
+    
+    return df
+
 
 def generate_ml_features(
     df: pd.DataFrame,
     target: str = "sales",
+    earthquake: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Generate machine learning features from the given DataFrame.
@@ -91,6 +112,9 @@ def generate_ml_features(
 
     X = create_date_features(X)
     X["sales_mov_avg"] = get_simple_mov_avg(df, window=7, column=target)
+    
+    if earthquake:
+        X = get_earthquake_features(X)
 
     return (X, y)
 
