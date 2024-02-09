@@ -133,9 +133,12 @@ class Factory:
 
         return self
 
-    def build_generator(self):
+    def build_generator(self, include_val_df = False):
         if self.train_df is None:
             raise ValueError("Data not found. Please fit the data first")
+        
+        if include_val_df and self.val_df is not None:
+            self.train_df = pd.concat([self.train_df, self.val_df])
         
         self._build_generator(self.train_df, self.model_config)
 

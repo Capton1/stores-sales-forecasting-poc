@@ -316,8 +316,11 @@ def process_data(
         features_to_select.append(data_config["target"])
     df = select_features(df, features_to_select)
 
-    df = group_by_date(df, mean=["dcoilwtico", "cluster"], sum=["onpromotion", "sales"])
-    df = min_max_scale_df(df, ["onpromotion", "dcoilwtico", "cluster"])
+    mean = ["dcoilwtico", "cluster"] if "cluster" in features_to_select else ["dcoilwtico"]
+    df = group_by_date(df, mean=mean, sum=["onpromotion", "sales"])
+    
+    scale_columns = ["onpromotion", "dcoilwtico", "cluster"] if "cluster" in features_to_select else ["onpromotion", "dcoilwtico"]
+    df = min_max_scale_df(df, scale_columns)
     df = input_missing_dates(df)
     df = one_hot_encode_df(df, ["typedays"])
 
