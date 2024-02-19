@@ -107,7 +107,7 @@ The model better capture sales variation despite low base level. To improve that
 
 This addition drastically improved the model and lowered the RMSE to $ 7.19e9 $.
 
-**Now that the model's performance is satisfactory, let's fine-tune it!**
+**Now that the model's performance is good enough, let's fine-tune it!**
 
 #### Fine-tuning
 
@@ -148,14 +148,56 @@ In the rest of the article, we calculate the shap values on a subset of the trai
 
 #### Local interpretability
 
-One of the visualizations we can produce is the force plot. Force plots, like the one shown below, allow you to see how features contributed to the model’s prediction for a specific observation. This is perfect for being able to explain to someone exactly how your model arrived at the prediction it did for a specific observation.
+One of the visualizations we can produce is the `force_plot()`. Force plots, like the one shown below, allow you to see how features contributed to the model’s prediction for a specific observation. This is perfect for being able to explain to someone exactly how your model arrived at the prediction it did for a specific observation.
 
 ![forceplot](pictures/force_plot.png)
 
 This graph shows the features that contribute to the movement of the model's base value (i.e. the average output). The most important features that push the prediction upwards are shown in red (here, the year). Those who push the prediction backwards are shown in blue (here, the moving average and the lack of promotion are the most importants).
 
-Another way to view this is by using the waterfall function as below :
+Another way to view this is by using the `waterfall()` function as below :
 
 ![waterfall](pictures/waterfall.png)
 
 #### Global interpretabilty
+
+Now, let's see how each features impact the model overall. For that, we can use the `beeswarm()` function :
+
+![beeswarm](pictures/beeswarm.png)
+
+Greater dispersion or higher point density indicates greater variability or lesser impact on model predictions. This makes it possible to evaluate the importance of the contribution of the characteristics to the model results. On the other way, colors indicate a positive or negative influence such as the local graphs seen above.
+
+We can see here that some variables have a huge impact on the prediction while other seem unnecessary to the prediction (ex: `cluster`, `is_year_end`). However, some variables like `earthquake`, have a low shap value despite a significant influence through experiments. So we can't delete a variable directly without testing it first. By removing the `cluster` variable from the training dataframe, the RMSE slightly improved to $ 3.31e9 $.
+
+#### Understanding the impact of each features
+
+In order to understand the impact of each features, we can use a dependence scatter plot. It shows the effect a single feature has on the predictions made by the model. For that, we can use the `scatter()` function :
+
+![onpromo](pictures/image-1.png)
+
+Here we see that the on_promotion feature does not have a linear contribution. Only extreme values (no promotions at all or many promotions) have  impact a strong impact on sales.
+
+![daymonth](pictures/image-2.png)
+
+We notice that the 1st days of the month have a strong positive impact on sales and that this impact quickly becomes nil. There is a slight increase in the middle and end of the month (employees are paid every 2 weeks in Ecuador).
+
+![dayweek](pictures/image-1.png)
+
+We can also see that the day of the week has an influence on sales: people don't buy in the middle of the week, but rather at the beginning and the end. 
+
+### To recap
+
+This article explored the factors influencing grocery sales in Ecuador using a data-centric and model-centric approach. We built a robust forecasting model and utilized SHAP values to gain insights into its decision-making process.
+
+Key Takeaways:
+
+- **Data Preparation :** We processed the original dataset, extracting relevant features and engineering time-related variables to capture seasonality.
+- **Model Development :** We employed XGBoost regression with various optimizations, including Bayesian hyperparameter tuning, to achieve an accurate model.
+- **Explainability with SHAP :** SHAP values provided local and global interpretability, revealing the individual and combined impact of each feature on sales predictions.
+
+**Beyond the Model :**
+
+While the model is accurate, further improvements could involve incorporating additional external factors or exploring more advanced interpretability techniques.
+
+Overall, this analysis demonstrates the power of data-driven approaches and interpretable models for understanding complex phenomena like grocery sales. By combining modeling with SHAP values, we can gain valuable insights into consumer behavior and inform data-driven decisions for businesses within the industry.
+
+I hope you found this helpful and are able to apply something you’ve learned to your own work!
