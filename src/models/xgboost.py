@@ -11,12 +11,7 @@ from xgboost import XGBRegressor
 
 
 def _build_xgboost(
-    n_estimators: int,
-    max_depth: int,
-    loss: str,
-    learning_rate: float,
-    eval_metric: str,
-    early_stopping_rounds: int,
+    params: Dict[str, Any],
 ) -> XGBRegressor:
     """
     Build an XGBoost model.
@@ -25,12 +20,7 @@ def _build_xgboost(
         XGBRegressor: The XGBoost model.
     """
     model = XGBRegressor(
-        n_estimators=n_estimators,
-        learning_rate=learning_rate,
-        objective=f"reg:{loss}",
-        max_depth=max_depth,
-        eval_metric=eval_metric,
-        early_stopping_rounds=early_stopping_rounds,
+        **params,
         random_state=42,
         n_jobs=-1,
         verbosity=1,
@@ -61,7 +51,7 @@ def build_xgboost(
             )
         return mlflow.pyfunc.load_model(f"runs:/{load_model_name}/model")
 
-    return _build_xgboost(**model_config["build_params"])
+    return _build_xgboost(model_config["build_params"])
 
 
 def xgboost_train(
