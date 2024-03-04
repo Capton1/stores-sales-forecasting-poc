@@ -132,7 +132,7 @@ We can therefore add a feature to our training dataframe to correct the unexplai
 The model has been further improved and the error lowered to $ 3.33e9 $.
 We could go on like this to make the model even more powerful, but let's move on the final part.
 
-### Model Explicability
+### Model Explainability
 
 Now that we have a robust model, let's turn to the original question: **What factors influence grocery sales in Ecuador ?**
 
@@ -180,7 +180,7 @@ Here we see that the on_promotion feature does not have a linear contribution. O
 
 We notice that the 1st days of the month have a strong positive impact on sales and that this impact quickly becomes nil. There is a slight increase in the middle and end of the month (employees are paid every 2 weeks in Ecuador).
 
-![dayweek](pictures/image-1.png)
+![dayweek](pictures/image-3.png)
 
 We can also see that the day of the week has an influence on sales: people don't buy in the middle of the week, but rather at the beginning and the end. 
 
