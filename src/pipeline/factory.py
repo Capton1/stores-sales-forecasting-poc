@@ -20,6 +20,7 @@ from models.xgboost import (build_xgboost, xgboost_cross_validation_train,
 from pipeline.helpers import load_scaler_from_model
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import process_data
+from xgboost import XGBRegressor
 
 
 class Factory:
@@ -44,6 +45,9 @@ class Factory:
 
     def get_df(self):
         return self.train_df, self.val_df
+    
+    def get_generator(self):
+        return self.train_generator
 
     def set_model_config(self, model_config: Dict[str, Any]):
         self.model_config = model_config
@@ -120,11 +124,23 @@ class Factory:
             self.train_generator = generate_ml_features(
                 self.train_df,
                 self.data_config["target"],
+                self.model_config["earthquake"] if "earthquake" in self.model_config else False,
             )
         elif self.model_config["_name"] == "prophet":
             self.train_generator = get_prophet_df(self.train_df, self.val_df)
         else:
             raise ValueError("Model not found")
+
+        return self
+
+    def build_generator(self, include_val_df = False):
+        if self.train_df is None:
+            raise ValueError("Data not found. Please fit the data first")
+        
+        if include_val_df and self.val_df is not None:
+            self.train_df = pd.concat([self.train_df, self.val_df])
+        
+        self._build_generator(self.train_df, self.model_config)
 
         return self
 
@@ -245,7 +261,7 @@ class Factory:
             return scaler.inverse_transform(np.reshape(res, (-1, 1))) if scaler else res
         elif self.model_config["_name"] == "xgboost":
             if data is None:
-                data = generate_ml_features(self.val_df, self.data_config["target"])[0]
+                data = generate_ml_features(self.val_df, self.data_config["target"], self.model_config["earthquake"] if "earthquake" in self.model_config else False)[0]
 
             return (
                 scaler.inverse_transform(self.model.predict(data).reshape(-1, 1))
@@ -274,7 +290,7 @@ class Factory:
 
         return self
 
-    def save_model(self, use_mlflow: bool = True):
+    def save_model(self, save_localy: bool = True):
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
 
@@ -318,7 +334,7 @@ class Factory:
             )
             mlflow.log_artifact(scaler_log_path)
 
-        if not use_mlflow:
+        if save_localy:
             pickle.dump(
                 self.model,
                 open(
@@ -353,7 +369,7 @@ class Factory:
         self, df: pd.DataFrame, model_type: str, n_iter: int, parameters: Dict[str, Any]
     ):
         self.model = get_basic_model(model_type)
-        self.model_config = {"_name": model_type}
+        self.model_config = {"_name": model_type, "earthquake": True, "scaled": False}
 
         self._build_generator(df, self.model_config)
 
