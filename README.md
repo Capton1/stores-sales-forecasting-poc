@@ -31,8 +31,4 @@ Dataset relevant columns (X) :
 Target (y) :
     - sales : gives the total sales for a product family at a particular store at a given date.
 
-TODO :
-    - Explicabilité des modèles de time series :
-        - Shap value
-        - Lime
-        - Partial distribution
+Medium article done
