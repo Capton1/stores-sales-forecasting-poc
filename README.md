@@ -1,5 +1,6 @@
 # stores-sales-forecasting-poc
 
+A medium article is available here : https://medium.com/@antoine.caille/what-factors-influence-grocery-sales-in-ecuador-fab4f4c4636d
 
 
 ## Getting started
