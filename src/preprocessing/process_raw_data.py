@@ -25,7 +25,7 @@ def merge_raw_df(
 
     res = pd.merge(res, holidays, how="left", on="date")
     res["type"] = res["type"].fillna("Normal")
-    res["transferred"] = res["transferred"].fillna(False)
+    res["transferred"] = res["transferred"].astype("boolean").fillna(False).astype(bool)
 
     res = pd.merge(res, stores, how="left", on="store_nbr")
 
@@ -90,7 +90,7 @@ def interpolate_data(df: pd.DataFrame, column: str) -> pd.DataFrame:
         pd.DataFrame: oil price df with no NA
     """
     df.loc[df[column] == 0, column] = np.nan
-    df.loc[:, column].interpolate(limit_direction="both", inplace=True)
+    df[column] = df[column].interpolate(limit_direction="both")
 
     return df
 
@@ -198,7 +198,8 @@ def input_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
     res["typedays"] = res["typedays"].fillna("Normal")
 
     # fill missing values in numeric columns
-    res.interpolate(method="linear", inplace=True)
+    numeric = res.select_dtypes(include="number").columns
+    res[numeric] = res[numeric].interpolate(method="linear")
     df = res
 
     return df
@@ -213,7 +214,7 @@ def get_preprocessing_pipeline(
         Pipeline: The preprocessing pipeline.
     """
     type_df = "test" if is_test_df else "train"
-    features_to_select = data_config["features"]
+    features_to_select = list(data_config["features"])
     if not is_test_df:
         features_to_select.append(data_config["target"])
 
@@ -311,7 +312,7 @@ def process_data(
     df = interpolate_data(df, "dcoilwtico")
     df = fix_transfered_holidays(df)
 
-    features_to_select = data_config["features"]
+    features_to_select = list(data_config["features"])
     if data_config["target"] not in features_to_select:
         features_to_select.append(data_config["target"])
     df = select_features(df, features_to_select)

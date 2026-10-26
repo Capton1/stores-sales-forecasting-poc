@@ -2,8 +2,54 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
-from keras.preprocessing.sequence import TimeseriesGenerator, pad_sequences
+from keras.utils import PyDataset, pad_sequences
 from xgboost import XGBRegressor
+
+
+class TimeseriesGenerator(PyDataset):
+    """
+    Generate batches of sliding windows over a time series.
+
+    Each sample is the `length` rows preceding a row, and its target is that row's target.
+
+    Args:
+        data (ndarray): The input data.
+        targets (ndarray): The target data.
+        length (int): The number of time steps in each window.
+        batch_size (int): The number of windows per batch.
+    """
+
+    def __init__(self, data, targets, length, batch_size=1):
+        super().__init__()
+        if len(data) != len(targets):
+            raise ValueError(
+                "Data and targets have to be"
+                + f" of same length. Data length is {len(data)}"
+                + f" while target length is {len(targets)}"
+            )
+        if length >= len(data):
+            raise ValueError(
+                f"`length` ({length}) must be smaller than the data length ({len(data)})"
+            )
+
+        self.data = data
+        self.targets = targets
+        self.length = length
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return -(-(len(self.targets) - self.length) // self.batch_size)
+
+    def _rows(self, index):
+        i = self.length + self.batch_size * index
+        return np.arange(i, min(i + self.batch_size, len(self.targets)))
+
+    def _windows(self, array, rows):
+        return np.array([array[row - self.length : row] for row in rows])
+
+    def __getitem__(self, index):
+        rows = self._rows(index)
+        return self._windows(self.data, rows), self.targets[rows]
 
 
 def get_features_and_target(
@@ -214,36 +260,20 @@ class MultipleInputTimeseriesGenerator(TimeseriesGenerator):
     """
 
     def __init__(self, X1, X2, Y, length, batch_size=1):
-        if len(X1) != len(Y) or len(X2) != len(Y) or len(X1) != len(X2):
+        if len(X2) != len(X1):
             raise ValueError(
-                "Data and targets have to be"
-                + f" of same length. X1 length is {len(X1)}, X2 length is {len(X2)}"
-                + f" while target length is {len(Y)}"
+                f"X1 and X2 have to be of same length. X1 length is {len(X1)}, X2 length is {len(X2)}"
             )
-
-        self.X1 = X1
+        super().__init__(X1, Y, length, batch_size=batch_size)
         self.X2 = X2
-        self.Y = Y
-        self.length = length
-        self.batch_size = batch_size
-        self.start_index = self.length
-        self.end_index = len(self.Y) - 1
-
-    def __len__(self):
-        return (self.end_index - self.start_index + self.batch_size) // self.batch_size
 
     def __getitem__(self, index):
         """Getting items from the 2 generators and packing them"""
-        i = self.start_index + self.batch_size * index
-        rows = np.arange(i, min(i + self.batch_size, self.end_index + 1), 1)
-
-        X1_batch = np.array([self.X1[row - self.length : row : 1] for row in rows])
-        X2_batch = np.array([self.X2[row - self.length : row : 1] for row in rows])
-        Y_batch = np.array([self.Y[row] for row in rows])
-
-        X_batch = [X1_batch, X2_batch]
-
-        return X_batch, Y_batch
+        rows = self._rows(index)
+        return (
+            (self._windows(self.data, rows), self._windows(self.X2, rows)),
+            self.targets[rows],
+        )
 
 
 def get_prophet_df(df: pd.DataFrame, df2: pd.DataFrame = None) -> pd.DataFrame:
@@ -257,10 +287,9 @@ def get_prophet_df(df: pd.DataFrame, df2: pd.DataFrame = None) -> pd.DataFrame:
         pd.DataFrame: The DataFrame with the required columns for Prophet.
     """
 
-    df["date"] = df.index
     if df2 is not None:
-        df2["date"] = df2.index
         df = pd.concat([df, df2], axis=0)
+    df = df.assign(date=df.index)
 
     return df[["date", "sales"]].rename(columns={"date": "ds", "sales": "y"})
 
