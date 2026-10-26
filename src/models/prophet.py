@@ -1,5 +1,3 @@
-import pathlib
-import pickle
 from typing import Any, Dict
 
 import mlflow
@@ -7,6 +5,8 @@ import pandas as pd
 from prophet import Prophet
 from prophet.diagnostics import cross_validation
 from sklearn.metrics import mean_squared_error
+
+from models.persistence import load_model_locally, run_model_uri
 
 
 def _build_prophet(parameters: Dict[str, str]) -> Prophet:
@@ -33,14 +33,9 @@ def build_prophet(
         Prophet: The built Prophet model.
     """
     if load_model_name:
-        if not mlflow:
-            return pickle.load(
-                open(
-                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                    "rb",
-                )
-            )
-        return mlflow.prophet.load_model(model_uri=f"runs:/{load_model_name}/model")
+        if not use_mlflow:
+            return load_model_locally("prophet", model_config["save_path"], load_model_name)
+        return mlflow.prophet.load_model(model_uri=run_model_uri(load_model_name))
 
     return _build_prophet(model_config["build_params"])
 

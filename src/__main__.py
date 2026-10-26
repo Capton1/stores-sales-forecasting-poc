@@ -19,7 +19,9 @@ def main(config_files: Namespace):
         pipeline_config=config_files.pipeline_config,
     )
 
-    mlflow.set_tracking_uri("http://0.0.0.0:5000")
+    mlflow.set_tracking_uri(
+        os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+    )
     e = mlflow.set_experiment(config["data"]["mlflow_experiment_name"])
 
     launch_pipeline(

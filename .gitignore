@@ -1,8 +1,24 @@
 ..bfg-report
-data
+/data/
 __pycache__
 .ipynb_checkpoints
+.venv/
+.pytest_cache/
 outputs/
 logs/
 mlruns/
 mlartifacts/
+mlflow.db
+notebooks/models_save/
+
+# trained models are reproduced by the pipeline and tracked in MLflow
+models_save/lstm/
+models_save/prophet/
+models_save/scaler/
+models_save/xgboost/*
+!models_save/xgboost/xgboost best_params_earthquake - 2024-02-07 14:40.json
+
+# credentials
+.env
+.env.*
+kaggle.json
