@@ -37,7 +37,7 @@ def get_space_of_hyperparameters(model_type: str) -> Dict[str, Any]:
             ),
             "reg_alpha": hp.choice("reg_alpha", [1e-5, 1e-2, 0.1, 1, 10, 100]),
             "reg_lambda": hp.choice("reg_lambda", [1e-5, 1e-2, 0.1, 1, 10, 100]),
-            "n_estimators": hp.choice("n_estimators", range(0, 5000, 1000)),
+            "n_estimators": hp.choice("n_estimators", range(1000, 6000, 1000)),
         }
     else:
         raise ValueError("Unknown model type")
@@ -68,10 +68,9 @@ def optimize_model(data_config: Dict[str, Any], model_type: str):
     res = space_eval(space, best)
 
     print(f"Saving best hyperparameters to {model_type}_best_hyperparameters.json")
-    with open(
-        f'{pathlib.Path(data_config["paths"]["optim"]).absolute()}/{model_type}_best_hyperparameters.json',
-        "w+",
-    ) as f:
+    optim_dir = pathlib.Path(data_config["paths"]["optim"]).absolute()
+    optim_dir.mkdir(parents=True, exist_ok=True)
+    with open(optim_dir / f"{model_type}_best_hyperparameters.json", "w+") as f:
         json.dump(res, f)
 
     print("\nOptimization finished")

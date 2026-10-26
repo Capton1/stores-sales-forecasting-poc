@@ -1,23 +1,21 @@
 import pathlib
-import pickle
-from datetime import datetime, timezone
 from functools import partial
 from typing import Any, Dict
 
 import mlflow
-import numpy as np
 import pandas as pd
 from hyperopt import Trials, fmin, tpe
 from sklearn.preprocessing import MinMaxScaler
 
 from models.lstm import build_lstm, lstm_cross_validation_train
+from models.persistence import save_model_locally, scaler_to_dict
 from models.prophet import build_prophet, prophet_cross_validation_train
 from models.training_helpers import (build_lstm_generator,
                                      generate_ml_features, get_basic_model,
                                      get_prophet_df)
 from models.xgboost import (build_xgboost, xgboost_cross_validation_train,
                             xgboost_objective_function)
-from pipeline.helpers import load_scaler_from_model
+from pipeline.helpers import load_scaler_from_model, timestamped_name
 from preprocessing.helpers import train_val_split
 from preprocessing.process_raw_data import process_data
 from xgboost import XGBRegressor
@@ -70,7 +68,16 @@ class Factory:
     def get_y_val(self):
         return self.val_df[self.data_config["target"]]
 
-    def _fit_data(self, X: pd.DataFrame, scaler: MinMaxScaler = None):
+    def _scale_target(self, df: pd.DataFrame, scaler: MinMaxScaler = None) -> pd.DataFrame:
+        """Return `df` with its target on the scale the model works on."""
+        if scaler is None:
+            return df
+        target = self.data_config["target"]
+        df = df.copy()
+        df[[target]] = scaler.transform(df[[target]])
+        return df
+
+    def _fit_data(self, X: pd.DataFrame):
         if self.train_df is not None:
             return self
 
@@ -78,19 +85,11 @@ class Factory:
 
         try:
             self.df = process_data(X, data_config=self.data_config)
-
-            # scale data if needed before splitting it
-            if scaler:
-                self.df[[self.data_config["target"]]] = scaler.fit_transform(
-                    self.df[[self.data_config["target"]]]
-                )
-                self.y_scaler = scaler
-
             self.train_df, self.val_df = train_val_split(
                 self.df, val_ratio=self.data_config["validation_ratio"]
             )
         except Exception as e:
-            raise ValueError("Unexpected error while processing data: ", e)
+            raise ValueError(f"Unexpected error while processing data: {e}") from e
 
         return self
 
@@ -103,31 +102,34 @@ class Factory:
                 else None
             )
 
-        scaler = (
-            MinMaxScaler(feature_range=(0, 1))
-            if ("scaled" in self.model_config and self.model_config["scaled"])
-            else None
-        )
+        self._fit_data(df)
 
-        self._fit_data(df, scaler)
+        # the scaler sees the training split only, so no validation data leaks into it
+        if self.model_config.get("scaled") and self.y_scaler is None:
+            self.y_scaler = MinMaxScaler(feature_range=(0, 1)).fit(
+                self.train_df[[self.data_config["target"]]]
+            )
+        train_df = self._scale_target(self.train_df, self.y_scaler)
 
         if self.model_config["_name"] == "lstm":
             (
                 self.train_generator,
                 self.input_data_shape,
             ) = build_lstm_generator(
-                self.train_df,
+                train_df,
                 self.model_config,
                 self.data_config["target"],
             )
         elif self.model_config["_name"] == "xgboost":
             self.train_generator = generate_ml_features(
-                self.train_df,
+                train_df,
                 self.data_config["target"],
-                self.model_config["earthquake"] if "earthquake" in self.model_config else False,
+                self.model_config.get("earthquake", False),
             )
         elif self.model_config["_name"] == "prophet":
-            self.train_generator = get_prophet_df(self.train_df, self.val_df)
+            self.train_generator = get_prophet_df(
+                train_df, self._scale_target(self.val_df, self.y_scaler)
+            )
         else:
             raise ValueError("Model not found")
 
@@ -232,11 +234,14 @@ class Factory:
         if not self.model:
             raise ValueError("Model not found. Please fit the data first")
 
-        scaler = (
-            load_scaler_from_model(self.registered_model_name)
-            if "scaled" in self.model_config and self.model_config["scaled"]
-            else None
-        )
+        # a loaded model brings the scaler it was trained with
+        scaler = None
+        if self.model_config.get("scaled"):
+            scaler = (
+                load_scaler_from_model(self.registered_model_name)
+                if self.registered_model_name
+                else self.y_scaler
+            )
 
         if self.model_config["_name"] == "lstm":
             if data is None:
@@ -245,23 +250,23 @@ class Factory:
                     [self.train_df[-self.model_config["look_back"] :], self.val_df]
                 )
                 data, shape = build_lstm_generator(
-                    val_lstm, self.model_config, self.data_config["target"]
+                    self._scale_target(val_lstm, scaler),
+                    self.model_config,
+                    self.data_config["target"],
                 )
                 self.input_data_shape = shape
 
-            res = []
-            for x in data:
-                elt = (
-                    [x[0][0], x[0][1]]
-                    if self.model_config["type"] == "multivariate"
-                    else x[0]
-                )
-                res.append(self.model.predict(elt)[0][0])
+            # the first time step of each window's prediction
+            res = self.model.predict(data, verbose=0)[:, 0].reshape(-1)
 
-            return scaler.inverse_transform(np.reshape(res, (-1, 1))) if scaler else res
+            return scaler.inverse_transform(res.reshape(-1, 1)) if scaler else res
         elif self.model_config["_name"] == "xgboost":
             if data is None:
-                data = generate_ml_features(self.val_df, self.data_config["target"], self.model_config["earthquake"] if "earthquake" in self.model_config else False)[0]
+                data = generate_ml_features(
+                    self._scale_target(self.val_df, scaler),
+                    self.data_config["target"],
+                    self.model_config.get("earthquake", False),
+                )[0]
 
             return (
                 scaler.inverse_transform(self.model.predict(data).reshape(-1, 1))
@@ -282,10 +287,10 @@ class Factory:
         if not self.model_config and not model_config:
             raise ValueError("Please provide model_config")
 
-        if ".h5" in load_model_name:
-            load_model_name = load_model_name.split(".")[0]
+        load_model_name = load_model_name.removesuffix(".h5")
 
-        self.model_config = dict(model_config)
+        if model_config:
+            self.model_config = dict(model_config)
         self._build_model(load_model_name, use_mlflow)
 
         return self
@@ -295,26 +300,26 @@ class Factory:
             raise ValueError("Model not found. Please fit the data first")
 
         if not self.save_name:
-            model_name = f'{self.model_config["_name"]} {self.model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+            model_name = timestamped_name(self.model_config["_name"], self.model_config_name)
         else:
             model_name = self.save_name
 
         if self.model_config["_name"] == "lstm":
-            mlflow.tensorflow.log_model(
+            mlflow.keras.log_model(
                 self.model,
-                artifact_path="model",
+                name="model",
                 registered_model_name=model_name,
             )
         elif self.model_config["_name"] == "xgboost":
-            mlflow.sklearn.log_model(
+            mlflow.xgboost.log_model(
                 self.model,
-                artifact_path="model",
+                name="model",
                 registered_model_name=model_name,
             )
         else:
             mlflow.prophet.log_model(
                 self.model,
-                artifact_path="model",
+                name="model",
                 registered_model_name=model_name,
             )
 
@@ -324,23 +329,14 @@ class Factory:
         mlflow.log_metric("MSE", self.val_mse)
 
         if self.y_scaler:
-            scaler_log_path = f"{pathlib.Path(self.data_config['paths']['scaler']).absolute()}/scaler.h5"
-            pickle.dump(
-                self.y_scaler,
-                open(
-                    scaler_log_path,
-                    "wb",
-                ),
-            )
-            mlflow.log_artifact(scaler_log_path)
+            mlflow.log_dict(scaler_to_dict(self.y_scaler), "scaler.json")
 
         if save_localy:
-            pickle.dump(
+            save_model_locally(
                 self.model,
-                open(
-                    f"{pathlib.Path(self.data_config['paths']['models'][self.model_config['_name']]).absolute()}/{model_name}.h5",
-                    "wb",
-                ),
+                self.model_config["_name"],
+                self.data_config["paths"]["models"][self.model_config["_name"]],
+                model_name,
             )
 
             print(f"Model saved as {model_name}")
@@ -351,17 +347,11 @@ class Factory:
         if self.train_df is None or self.val_df is None:
             raise ValueError("Data not found. Please fit the data first")
 
-        file_name = self.data_config["paths"]["processed"]["train"].split("/")[-1]
-        self.train_df.to_csv(
-            f"{pathlib.Path(self.data_config['paths']['processed']['train']).absolute()}"
-        )
-        print(f"Processed training set saved as {file_name}")
-
-        file_name = self.data_config["paths"]["processed"]["validation"].split("/")[-1]
-        self.val_df.to_csv(
-            f"{pathlib.Path(self.data_config['paths']['processed']['validation']).absolute()}"
-        )
-        print(f"Processed validation set saved as {file_name}")
+        for df, split in ((self.train_df, "train"), (self.val_df, "validation")):
+            path = pathlib.Path(self.data_config["paths"]["processed"][split]).absolute()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(path)
+            print(f"Processed {split} set saved as {path.name}")
 
         return self
 

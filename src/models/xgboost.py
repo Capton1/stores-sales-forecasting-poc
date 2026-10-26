@@ -1,5 +1,3 @@
-import pathlib
-import pickle
 from typing import Any, Dict, Tuple
 
 import mlflow
@@ -8,6 +6,8 @@ from hyperopt import STATUS_OK
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from xgboost import XGBRegressor
+
+from models.persistence import load_model_locally, run_model_uri
 
 
 def _build_xgboost(
@@ -43,13 +43,8 @@ def build_xgboost(
     """
     if load_model_name:
         if not use_mlflow:
-            return pickle.load(
-                open(
-                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                    "rb",
-                )
-            )
-        return mlflow.pyfunc.load_model(f"runs:/{load_model_name}/model")
+            return load_model_locally("xgboost", model_config["save_path"], load_model_name)
+        return mlflow.xgboost.load_model(run_model_uri(load_model_name))
 
     return _build_xgboost(model_config["build_params"])
 
