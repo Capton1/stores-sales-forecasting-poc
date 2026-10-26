@@ -31,7 +31,14 @@ Training and evaluation log to MLflow. Start a server bound to localhost only, s
 $ make mlflow
 ```
 
-The pipeline uses `MLFLOW_TRACKING_URI` when it is set and `http://127.0.0.1:5000` otherwise. On macOS the AirPlay Receiver also listens on port 5000 and answers 403; disable it or start the server on another port and point `MLFLOW_TRACKING_URI` there.
+Runs and registered models are stored in `mlflow.db` and `mlartifacts/` at the repository root, both ignored by git.
+
+The pipeline uses `MLFLOW_TRACKING_URI` when it is set and `http://127.0.0.1:5000` otherwise. On macOS the AirPlay Receiver also listens on port 5000 and answers 403; disable it or use another port :
+
+```sh
+$ make mlflow MLFLOW_PORT=5001
+$ export MLFLOW_TRACKING_URI=http://127.0.0.1:5001
+```
 
 ## Usage
 
