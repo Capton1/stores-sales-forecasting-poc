@@ -1,13 +1,13 @@
 import math
 import pathlib
-from datetime import datetime, timezone
 from typing import Any, Dict
 
 import mlflow
 from sklearn.metrics import mean_squared_error
 
 from pipeline.factory import Factory
-from pipeline.helpers import convert_config_to_dict, get_config_from_model_name
+from pipeline.helpers import (convert_config_to_dict, get_config_from_model_name,
+                              get_run_id_from_model_name, timestamped_name)
 from pipeline.optim import optimize_model
 from preprocessing.process_raw_data import load_data
 
@@ -84,13 +84,7 @@ def evaluate_model(
     if "scaled" not in model_config:
         model_config["scaled"] = False
 
-    id = (
-        mlflow.search_registered_models(filter_string=f"name = '{model_name}'")[0]
-        .latest_versions[0]
-        .run_id
-    )
-
-    f.load_model(id, model_config)
+    f.load_model(get_run_id_from_model_name(model_name), model_config)
     y_val = f.get_y_val()
     pred = f.predict()
 
@@ -112,7 +106,7 @@ def validation_pipeline(models_to_validate: Dict[str, Any], config: Dict[str, An
     """
     data_config = config["data"]
 
-    filename = f'Validation - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+    filename = timestamped_name("Validation")
     print(f"Writing validation results in `{filename}` ... \n")
 
     df = load_data(data_config["paths"])
@@ -120,10 +114,9 @@ def validation_pipeline(models_to_validate: Dict[str, Any], config: Dict[str, An
     f.fit(df)
 
     min_mse, best_type, best_model = math.inf, None, None
-    with open(
-        f'{pathlib.Path(data_config["paths"]["logs"]["validation"]).absolute()}/{filename}',
-        "w+",
-    ) as file:
+    logs_dir = pathlib.Path(data_config["paths"]["logs"]["validation"]).absolute()
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    with open(logs_dir / filename, "w+") as file:
         for model_type, models in models_to_validate.items():
             if models is None:
                 continue
@@ -169,7 +162,7 @@ def launch_pipeline(
             for i in ["lstm", "xgboost", "prophet"]:
                 for j in config[i]:
                     print(f"Training {i} {j} ...")
-                    save_name = f'{i} {j} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+                    save_name = timestamped_name(i, j)
                     with mlflow.start_run(nested=True, run_name=save_name):
                         generate_models(
                             config["data"],
@@ -179,7 +172,7 @@ def launch_pipeline(
                             save_name=save_name,
                         )
         else:
-            save_name = f'{model} {model_config_name} - {str(datetime.now(timezone.utc)).split(".")[0].rsplit(":", maxsplit=1)[0]}'
+            save_name = timestamped_name(model, model_config_name)
             if save:
                 mlflow.start_run(experiment_id=experiment_id, run_name=save_name)
 

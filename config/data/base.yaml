@@ -1,0 +1,33 @@
+# Kaggle "store-sales-time-series-forecasting" files, unzipped into data/raw
+paths:
+  raw:
+    train: data/raw/train.csv
+    test: data/raw/test.csv
+    holidays: data/raw/holidays_events.csv
+    oils: data/raw/oil.csv
+    stores: data/raw/stores.csv
+  processed:
+    train: data/processed/train.csv
+    validation: data/processed/validation.csv
+    test: data/processed/test.csv
+  trusted:
+    train: data/trusted/train.csv
+    test: data/trusted/test.csv
+  models:
+    lstm: models_save/lstm
+    xgboost: models_save/xgboost
+    prophet: models_save/prophet
+  optim: models_save/optim
+  logs:
+    validation: logs/validation
+
+features:
+  - date
+  - onpromotion
+  - dcoilwtico
+  - cluster
+  - typedays
+target: sales
+# share of the chronologically ordered days used for training
+validation_ratio: 0.9
+mlflow_experiment_name: stores-sales-forecasting

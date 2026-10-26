@@ -1,12 +1,12 @@
-import pathlib
-import pickle
 from typing import Any, Dict, Tuple
 
 import mlflow
 import pandas as pd
 from keras.layers import LSTM, Activation, Concatenate, Dense, Input
 from keras.models import Model, Sequential
-from tensorflow.keras.regularizers import L1L2
+from keras.regularizers import L1L2
+
+from models.persistence import load_model_locally, run_model_uri
 
 
 def _build_simple_lstm(
@@ -25,11 +25,11 @@ def _build_simple_lstm(
     """
     # Input layers shape : (batch_size, look_back, n_features)
     model = Sequential()
+    model.add(Input(shape=input_shape))
     model.add(
         LSTM(
             50,
             activation="relu",
-            input_shape=input_shape,
             return_sequences=False,
             dropout=0.2,
             kernel_regularizer=reg,
@@ -137,13 +137,8 @@ def build_lstm(
     """
     if load_model_name:
         if not use_mlflow:
-            return pickle.load(
-                open(
-                    f"{pathlib.Path(model_config['save_path']).absolute()}/{load_model_name}.h5",
-                    "rb",
-                )
-            )
-        return mlflow.pyfunc.load_model(f"runs:/{load_model_name}/model")
+            return load_model_locally("lstm", model_config["save_path"], load_model_name)
+        return mlflow.keras.load_model(run_model_uri(load_model_name))
 
     reg = build_regularization(model_config)
 

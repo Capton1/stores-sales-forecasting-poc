@@ -19,7 +19,9 @@ def main(config_files: Namespace):
         pipeline_config=config_files.pipeline_config,
     )
 
-    mlflow.set_tracking_uri("http://0.0.0.0:5000")
+    mlflow.set_tracking_uri(
+        os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+    )
     e = mlflow.set_experiment(config["data"]["mlflow_experiment_name"])
 
     launch_pipeline(
@@ -74,7 +76,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("-s", "--save", help="save data or model", action="store_true")
-    parser.add_argument("-l", "--load", default=None, help="path to model to load")
+    parser.add_argument("-l", "--load", default=None, help="MLflow run id of the model to start from")
 
     args = parser.parse_args()
 
