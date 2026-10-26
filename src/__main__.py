@@ -76,7 +76,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("-s", "--save", help="save data or model", action="store_true")
-    parser.add_argument("-l", "--load", default=None, help="path to model to load")
+    parser.add_argument("-l", "--load", default=None, help="MLflow run id of the model to start from")
 
     args = parser.parse_args()
 
